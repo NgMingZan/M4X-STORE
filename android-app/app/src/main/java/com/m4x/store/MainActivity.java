@@ -15,17 +15,21 @@ import android.webkit.CookieManager;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+
+import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
 
-    @SuppressLint({"SetJavaScriptEnabled", "AllowFileAccessFromFileURLs"})
+    @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -41,15 +45,50 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
-        s.setAllowFileAccess(true);
+        s.setAllowFileAccess(false);
         s.setAllowContentAccess(true);
-        s.setAllowFileAccessFromFileURLs(true);
-        s.setAllowUniversalAccessFromFileURLs(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
 
-        webView.setWebViewClient(new WebViewClient());
+        // Serve bundled HTML through ONE HTTPS origin.
+        // This makes Supabase session/localStorage shared by index.html and admin.html.
+        final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
+
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(
+                    WebView view, WebResourceRequest request
+            ) {
+                return assetLoader.shouldInterceptRequest(request.getUrl());
+            }
+
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
+                return assetLoader.shouldInterceptRequest(Uri.parse(url));
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(
+                    WebView view, WebResourceRequest request
+            ) {
+                Uri uri = request.getUrl();
+                String scheme = uri.getScheme();
+
+                if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+                    return false;
+                }
+
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
+                    return true;
+                } catch (Exception ignored) {
+                    return false;
+                }
+            }
+        });
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -58,7 +97,9 @@ public class MainActivity extends Activity {
                     ValueCallback<Uri[]> newCallback,
                     FileChooserParams params
             ) {
-                if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+                if (filePathCallback != null) {
+                    filePathCallback.onReceiveValue(null);
+                }
                 filePathCallback = newCallback;
 
                 Intent intent;
@@ -122,15 +163,17 @@ public class MainActivity extends Activity {
             }
         });
 
-        webView.loadUrl("file:///android_asset/index.html");
+        webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILE_CHOOSER_REQUEST) {
             Uri[] results = null;
+
             if (resultCode == Activity.RESULT_OK && data != null) {
                 ClipData clip = data.getClipData();
+
                 if (clip != null) {
                     results = new Uri[clip.getItemCount()];
                     for (int i = 0; i < clip.getItemCount(); i++) {
@@ -140,19 +183,24 @@ public class MainActivity extends Activity {
                     results = new Uri[]{data.getData()};
                 }
             }
+
             if (filePathCallback != null) {
                 filePathCallback.onReceiveValue(results);
                 filePathCallback = null;
             }
             return;
         }
+
         super.onActivityResult(requestCode, resultCode, data);
     }
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) webView.goBack();
-        else super.onBackPressed();
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
     }
 
     @Override
@@ -161,6 +209,7 @@ public class MainActivity extends Activity {
             filePathCallback.onReceiveValue(null);
             filePathCallback = null;
         }
+
         if (webView != null) webView.destroy();
         super.onDestroy();
     }
