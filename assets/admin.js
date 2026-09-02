@@ -12,7 +12,7 @@ const money=n=>new Intl.NumberFormat('vi-VN').format(Number(n||0))+'đ';
 const dt=v=>v?new Date(v).toLocaleString('vi-VN'):'';
 const slugify=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/đ/g,'d').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 
-const st={cats:[],products:[],orders:[],users:[],topups:[],notices:[],downloads:[],security:[]};
+const st={cats:[],products:[],orders:[],users:[],topups:[],notices:[],downloads:[],security:[],giftCodes:[],tasks:[]};
 let booting=false;
 
 function showLogin(message=''){
@@ -99,7 +99,7 @@ async function boot(){
 }
 async function refresh(){
   await Promise.all([loadCats(),loadUsers(),loadProducts()]);
-  await Promise.all([loadOrders(),loadTopups(),loadNotices(),loadSecurity()]);
+  await Promise.all([loadOrders(),loadTopups(),loadNotices(),loadSecurity(),loadGiftCodes(),loadTasks()]);
   renderStats();
 }
 
@@ -497,6 +497,69 @@ async function loadNotices(){
     </div>`).join('')||'<div class="muted">Chưa có.</div>';
 }
 
+
+async function loadGiftCodes(){
+  const {data,error}=await sb.from('gift_codes').select('*,products(name)').order('created_at',{ascending:false});
+  if(error){console.warn(error);return}
+  st.giftCodes=data||[];
+  const sel=$('gcProduct');
+  if(sel)sel.innerHTML='<option value="">Chọn sản phẩm</option>'+st.products.map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join('');
+  const box=$('giftCodeList');
+  if(box)box.innerHTML=st.giftCodes.map(g=>'<div class="item"><div class="row"><div><b>'+esc(g.code)+'</b><div class="muted">'+esc(g.title)+' · '+esc(g.reward_type)+' · '+g.used_count+'/'+g.max_uses+'</div></div><button class="btn '+(g.active?'bad':'okbtn')+'" onclick="ADM.toggleGiftCode(\''+g.id+'\','+(!g.active)+')">'+(g.active?'Tắt':'Bật')+'</button></div></div>').join('')||'<div class="muted">Chưa có code.</div>';
+}
+async function createGiftCode(){
+  const type=$('gcType').value;
+  const payload={
+    code:$('gcCode').value.trim().toUpperCase(),
+    title:$('gcTitle').value.trim()||'M4X Gift',
+    reward_type:type,
+    reward_amount:type==='balance'?Number($('gcAmount').value||0):null,
+    product_id:type==='product'?($('gcProduct').value||null):null,
+    max_uses:Number($('gcMaxUses').value||1),
+    per_user_limit:1,
+    expires_at:$('gcExpiry').value?new Date($('gcExpiry').value).toISOString():null,
+    active:true
+  };
+  const {error}=await sb.from('gift_codes').insert(payload);
+  $('gcMsg').textContent=error?error.message:'Đã tạo code.';
+  if(!error){$('gcCode').value='';await loadGiftCodes()}
+}
+async function toggleGiftCode(id,v){
+  const {error}=await sb.from('gift_codes').update({active:v}).eq('id',id);
+  if(error)alert(error.message);else loadGiftCodes();
+}
+async function loadTasks(){
+  const {data,error}=await sb.from('reward_tasks').select('*').order('created_at',{ascending:false});
+  if(error){console.warn(error);return}
+  st.tasks=data||[];
+  const box=$('taskList');
+  if(box)box.innerHTML=st.tasks.map(t=>'<div class="item"><div class="row"><div><b>'+esc(t.title)+'</b><div class="muted">'+esc(t.task_type)+' · +'+money(t.reward_amount)+'</div></div><button class="btn '+(t.active?'bad':'okbtn')+'" onclick="ADM.toggleTask(\''+t.id+'\','+(!t.active)+')">'+(t.active?'Tắt':'Bật')+'</button></div></div>').join('')||'<div class="muted">Chưa có nhiệm vụ.</div>';
+}
+function taskTypeChanged(){
+  const type=$('taskType').value;
+  if(type==='rewarded_ad'){$('taskReward').value='1000';$('taskDaily').value='3'}
+  else if(type==='link'){$('taskReward').value='2000';$('taskDaily').value='1'}
+}
+async function createTask(){
+  const payload={
+    title:$('taskTitle').value.trim(),
+    description:$('taskDesc').value.trim(),
+    task_type:$('taskType').value,
+    reward_amount:Number($('taskReward').value||0),
+    destination_url:$('taskUrl').value.trim()||null,
+    completion_code:$('taskCode').value.trim()||null,
+    daily_limit:Number($('taskDaily').value||1),
+    active:true
+  };
+  const {error}=await sb.from('reward_tasks').insert(payload);
+  $('taskMsg').textContent=error?error.message:'Đã tạo nhiệm vụ.';
+  if(!error){$('taskTitle').value='';await loadTasks()}
+}
+async function toggleTask(id,v){
+  const {error}=await sb.from('reward_tasks').update({active:v}).eq('id',id);
+  if(error)alert(error.message);else loadTasks();
+}
+
 async function loadSecurity(){
   const [{data:d,error:de},{data:s,error:se}]=await Promise.all([
     sb.from('download_logs').select('*').order('created_at',{ascending:false}).limit(100),
@@ -555,7 +618,7 @@ function renderStats(){
 Object.assign(window.ADM,{
   login,logout,refresh,toggleStock,addCategory,deleteCategory,
   saveProduct,editProduct,resetProductForm,toggleProduct,deleteProduct,
-  adjustBalance,setBlocked,refund,broadcast
+  adjustBalance,setBlocked,refund,broadcast,createGiftCode,toggleGiftCode,taskTypeChanged,createTask,toggleTask
 });
 
 for(const [id,fn] of [

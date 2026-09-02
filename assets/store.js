@@ -6,7 +6,7 @@ const sb=supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY);
 
 const state={
   me:null,profile:null,products:[],categories:[],owned:new Map(),
-  notifications:[],view:'store',activeCat:'all',query:'',poll:null
+  notifications:[],tasks:[],promo:null,view:'store',activeCat:'all',query:'',poll:null
 };
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
@@ -65,7 +65,7 @@ function updateNotifBadge(){
 }
 async function bootstrap(){
   await loadAuth();
-  await Promise.all([loadProducts(),loadOwned(),loadNotifications()]);
+  await Promise.all([loadProducts(),loadOwned(),loadNotifications(),loadLaunchPromo()]);
   renderView();
   checkUpdate(false);
 }
@@ -85,6 +85,7 @@ function renderView(){
   }
   if(state.view==='store')renderStore();
   else if(state.view==='library')renderLibrary();
+  else if(state.view==='rewards')renderRewards();
   else if(state.view==='notifications')renderNotifications();
   else renderAccount();
 }
@@ -246,6 +247,7 @@ function topup(){
   if(!state.me)return auth('login');
   openModal(`
     <h2>Nạp tiền</h2>
+    ${state.promo&&state.promo.active&&new Date(state.promo.ends_at)>new Date()?`<div class="notice"><b>🎁 TƯNG BỪNG KHAI TRƯƠNG</b><br>Nạp tiền nhận thêm <b>+${Number(state.promo.bonus_percent)}%</b> giá trị. Ưu đãi đến ${dt(state.promo.ends_at)}.</div>`:''}
     <p class="muted">Số dư chỉ dùng để mua sản phẩm trong M4X STORE.</p>
     <div class="toolbar">
       <button class="btn ghost" onclick="M4X.makeTopup(20000)">20K</button>
@@ -313,6 +315,81 @@ function renderLibrary(){
       </div>`;
     }).join('')||'<div class="muted">Bạn chưa mua sản phẩm nào.</div>'}`;
 }
+
+
+async function loadLaunchPromo(){
+  const {data}=await sb.from('store_promotions')
+    .select('*')
+    .eq('code','LAUNCH_TOPUP')
+    .maybeSingle();
+  state.promo=data||null;
+}
+
+async function loadRewardTasks(){
+  if(!state.me){state.tasks=[];return}
+  const {data,error}=await sb.from('reward_tasks').select('*').eq('active',true).order('created_at',{ascending:false});
+  if(error){console.warn(error);state.tasks=[];return}
+  state.tasks=data||[];
+}
+async function renderRewards(){
+  if(!state.me){
+    $('view').innerHTML='<div class="sectionTitle">Nhiệm vụ kiếm thưởng</div><div class="item"><p class="muted">Đăng nhập để làm nhiệm vụ.</p><button class="btn" onclick="M4X.auth(\'login\')">Đăng nhập</button></div>';
+    return;
+  }
+  await loadRewardTasks();
+  const {data:ci}=await sb.rpc('get_checkin_status');
+  const checkinHtml='<div class="item"><div class="row"><div><b>🔥 Check-in 7 ngày</b><div class="muted">'+
+    (ci?.checked_today?('Hôm nay đã check-in · Ngày '+ci.cycle_day+'/7'):('Ngày tiếp theo: '+(ci?.next_day||1)+'/7'))+
+    '</div></div><b class="ok">Ngày 7 +10.000đ</b></div><div class="toolbar"><button class="btn" '+(ci?.checked_today?'disabled':'')+' onclick="M4X.claimCheckin()">'+(ci?.checked_today?'Đã check-in':'Check-in hôm nay')+'</button></div></div>';
+  $('view').innerHTML='<div class="sectionTitle">Nhiệm vụ kiếm thưởng</div><p class="muted">📺 Xem quảng cáo +1.000đ · 🔗 Vượt link +2.000đ · 🔥 Check-in đủ 7 ngày +10.000đ.</p><button class="btn ghost" onclick="M4X.redeemCode()">Nhập gift code</button>'+checkinHtml+
+    (state.tasks.map(t=>'<div class="item"><div class="row"><div><b>'+esc(t.title)+'</b><div class="muted">'+esc(t.description||'')+'</div></div><b class="ok">+'+money(t.reward_amount)+'</b></div><div class="toolbar">'+
+      (t.task_type==='link'&&t.destination_url?'<button class="btn ghost" onclick="location.href=\''+esc(t.destination_url)+'\'">Mở nhiệm vụ</button>':'')+
+      (t.task_type==='rewarded_ad'?'<button class="btn" onclick="M4X.watchRewardedAd(\''+t.id+'\')">Xem quảng cáo</button>':'<button class="btn" onclick="M4X.completeTask(\''+t.id+'\')">Nhận thưởng</button>')+
+    '</div></div>').join('')||'<div class="muted">Chưa có nhiệm vụ.</div>');
+}
+function redeemCode(){
+  if(!state.me)return auth('login');
+  openModal('<h2>Nhập gift code</h2><input id="giftCodeInput" class="input" placeholder="Ví dụ: M4X-2026"><button class="btn" onclick="M4X.submitGiftCode()">Nhận quà</button><div id="giftMsg" class="muted"></div>');
+}
+async function submitGiftCode(){
+  const code=$('giftCodeInput').value.trim();
+  if(!code)return;
+  const {data,error}=await sb.rpc('redeem_gift_code',{p_code:code});
+  $('giftMsg').textContent=error?error.message:'Nhận quà thành công!';
+  if(!error){await Promise.all([loadAuth(),loadOwned(),loadNotifications()]);setTimeout(()=>{closeModal();setView('account')},700)}
+}
+async function completeTask(id){
+  const t=state.tasks.find(x=>x.id===id); if(!t)return;
+  let code=null;
+  if(t.task_type==='link'||t.task_type==='manual'){
+    code=prompt('Nhập mã hoàn thành nhiệm vụ:');
+    if(!code)return;
+  }
+  const {data,error}=await sb.rpc('complete_reward_task',{p_task_id:id,p_completion_code:code});
+  if(error)alert(error.message);
+  else{alert('Đã nhận '+money(data.reward_amount));await Promise.all([loadAuth(),loadNotifications()]);renderRewards()}
+}
+
+async function claimCheckin(){
+  const {data,error}=await sb.rpc('claim_daily_checkin');
+  if(error){alert(error.message);return}
+  if(Number(data.reward_amount||0)>0){
+    alert('🔥 Đủ 7 ngày! Bạn nhận '+money(data.reward_amount));
+  }else{
+    alert('Check-in thành công · Ngày '+data.cycle_day+'/7');
+  }
+  await Promise.all([loadAuth(),loadNotifications()]);
+  renderRewards();
+}
+
+function watchRewardedAd(taskId){
+  if(window.AndroidRewardAds&&typeof window.AndroidRewardAds.showRewardedAd==='function'){
+    window.AndroidRewardAds.showRewardedAd(taskId);
+  }else{
+    alert('Chưa cấu hình quảng cáo Rewarded. Cần AdMob App ID và Rewarded Ad Unit ID.');
+  }
+}
+
 async function renderNotifications(){
   if(!state.me){
     $('view').innerHTML=`<div class="sectionTitle">Thông báo</div><div class="item"><button class="btn" onclick="M4X.auth('login')">Đăng nhập</button></div>`;return;
@@ -343,6 +420,7 @@ async function renderAccount(){
     <div class="big">${money(state.profile?.balance||0)}</div><div class="muted">${esc(state.me.email)}</div>
     <div class="toolbar">
       <button class="btn" onclick="M4X.topup()">+ Nạp tiền</button>
+      <button class="btn ghost" onclick="M4X.redeemCode()">Nhập code</button>
       ${state.profile?.role==='admin'?'<button class="btn ghost" onclick="location.href=\'./admin.html\'">Quản trị</button>':''}
       <button class="btn ghost" onclick="M4X.editProfile()">Sửa tài khoản</button>
       <button class="btn ghost" onclick="M4X.checkUpdate(true)">Kiểm tra cập nhật</button>
@@ -406,7 +484,7 @@ function policy(type){
 }
 Object.assign(window.M4X,{
   product,action,auth,login,register,forgot,logout,buy,topup,makeTopup,download,
-  readNotif,readAll,editProfile,saveName,changePass,checkUpdate,policy
+  readNotif,readAll,editProfile,saveName,changePass,checkUpdate,policy,redeemCode,submitGiftCode,completeTask,claimCheckin,watchRewardedAd
 });
 document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 $('accountQuick').onclick=()=>setView('account');

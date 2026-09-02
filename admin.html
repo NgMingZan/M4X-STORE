@@ -38,6 +38,8 @@
     <button type="button" class="tab" data-tab="users">Người dùng</button>
     <button type="button" class="tab" data-tab="topups">Nạp tiền</button>
     <button type="button" class="tab" data-tab="notices">Thông báo</button>
+    <button type="button" class="tab" data-tab="codes">Gift code</button>
+    <button type="button" class="tab" data-tab="tasks">Nhiệm vụ</button>
     <button type="button" class="tab" data-tab="security">Bảo mật</button>
     <button type="button" class="tab" data-tab="appinfo">Ứng dụng</button>
   </nav>
@@ -178,6 +180,43 @@
         <div id="nMsg" class="muted"></div>
       </div>
       <div id="noticeList"></div>
+    </div>
+  </section>
+
+  
+  <section id="codes" class="panel">
+    <div class="grid2">
+      <div class="item">
+        <h2>Tạo gift code</h2>
+        <input id="gcCode" class="input" placeholder="M4X-NEWUSER">
+        <input id="gcTitle" class="input" placeholder="Tên chương trình">
+        <select id="gcType" class="select"><option value="balance">Tặng số dư</option><option value="product">Tặng sản phẩm</option></select>
+        <input id="gcAmount" class="input" type="number" min="0" placeholder="Số dư tặng">
+        <select id="gcProduct" class="select"><option value="">Chọn sản phẩm</option></select>
+        <input id="gcMaxUses" class="input" type="number" min="1" value="1" placeholder="Tổng lượt dùng">
+        <input id="gcExpiry" class="input" type="datetime-local">
+        <button type="button" class="btn" onclick="ADM.createGiftCode()">Tạo code</button>
+        <div id="gcMsg" class="muted"></div>
+      </div>
+      <div id="giftCodeList"></div>
+    </div>
+  </section>
+
+  <section id="tasks" class="panel">
+    <div class="grid2">
+      <div class="item">
+        <h2>Tạo nhiệm vụ</h2>
+        <input id="taskTitle" class="input" placeholder="Tên nhiệm vụ">
+        <textarea id="taskDesc" class="textarea" placeholder="Mô tả"></textarea>
+        <select id="taskType" class="select" onchange="ADM.taskTypeChanged()"><option value="link">Vượt link / mở link</option><option value="rewarded_ad">Xem quảng cáo</option><option value="manual">Nhập mã</option></select>
+        <input id="taskReward" class="input" type="number" min="0" value="2000" placeholder="Thưởng">
+        <input id="taskUrl" class="input" type="url" placeholder="Link nhiệm vụ">
+        <input id="taskCode" class="input" placeholder="Mã hoàn thành">
+        <input id="taskDaily" class="input" type="number" min="1" value="1" placeholder="Giới hạn/ngày">
+        <button type="button" class="btn" onclick="ADM.createTask()">Tạo nhiệm vụ</button>
+        <div id="taskMsg" class="muted"></div>
+      </div>
+      <div id="taskList"></div>
     </div>
   </section>
 
