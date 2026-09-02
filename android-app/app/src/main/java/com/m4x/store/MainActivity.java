@@ -17,6 +17,7 @@ import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -27,8 +28,11 @@ import android.widget.Toast;
 import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
+    private static final String REMOTE_STORE_URL = "https://ngmingzan.github.io/M4X-STORE/";
+    private static final String LOCAL_STORE_URL = "https://appassets.androidplatform.net/assets/index.html";
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private WebView webView;
+    private boolean triedLocalFallback = false;
     private ValueCallback<Uri[]> filePathCallback;
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -71,6 +75,20 @@ public class MainActivity extends Activity {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
                 return assetLoader.shouldInterceptRequest(Uri.parse(url));
+            }
+
+            @Override
+            public void onReceivedError(
+                    WebView view,
+                    WebResourceRequest request,
+                    WebResourceError error
+            ) {
+                if (request.isForMainFrame()
+                        && !triedLocalFallback
+                        && request.getUrl().toString().startsWith(REMOTE_STORE_URL)) {
+                    triedLocalFallback = true;
+                    view.loadUrl(LOCAL_STORE_URL);
+                }
             }
 
             @Override
@@ -166,7 +184,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
+        webView.loadUrl(REMOTE_STORE_URL);
     }
 
     @Override
