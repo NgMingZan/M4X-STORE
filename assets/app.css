@@ -42,7 +42,7 @@ a{color:inherit}
 .gallery{display:flex;gap:8px;overflow:auto;margin:12px 0}.gallery img{width:220px;aspect-ratio:16/10;object-fit:cover;border-radius:16px;border:1px solid var(--line)}
 .meta{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}.meta>div{background:#0d1118;border:1px solid var(--line);border-radius:14px;padding:11px}
 .notice{padding:12px;border-radius:14px;border:1px solid #4d4124;background:#241f12;color:#ffe6a5;margin:10px 0}
-.bottomnav{position:fixed;left:50%;transform:translateX(-50%);bottom:10px;width:min(620px,calc(100% - 20px));z-index:50;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:rgba(15,18,25,.92);backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:20px;padding:7px}
+.bottomnav{position:fixed;left:50%;transform:translateX(-50%);bottom:10px;width:min(620px,calc(100% - 20px));z-index:50;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;background:rgba(15,18,25,.92);backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:20px;padding:7px}
 .navbtn{border:0;background:transparent;color:var(--muted);padding:10px 4px;border-radius:14px;font-weight:800}.navbtn.active{background:#fff;color:#090b10}
 .badge{display:inline-flex;min-width:20px;height:20px;border-radius:999px;background:#ff5964;color:#fff;align-items:center;justify-content:center;padding:0 6px;font-size:11px}
 .updatebar{display:none;padding:11px 13px;background:#15271f;border:1px solid #315c48;border-radius:15px;margin:8px 0}.updatebar.show{display:flex;align-items:center;justify-content:space-between;gap:8px}

@@ -618,7 +618,7 @@ function renderStats(){
 Object.assign(window.ADM,{
   login,logout,refresh,toggleStock,addCategory,deleteCategory,
   saveProduct,editProduct,resetProductForm,toggleProduct,deleteProduct,
-  adjustBalance,setBlocked,refund,broadcast,createGiftCode,toggleGiftCode,taskTypeChanged,createTask,toggleTask
+  adjustBalance,setBlocked,refund,broadcast,createGiftCode,toggleGiftCode,taskTypeChanged,createTask,toggleTask,createGiftCode,toggleGiftCode,taskTypeChanged,createTask,toggleTask
 });
 
 for(const [id,fn] of [

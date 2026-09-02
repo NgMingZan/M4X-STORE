@@ -86,6 +86,7 @@ function renderView(){
   if(state.view==='store')renderStore();
   else if(state.view==='library')renderLibrary();
   else if(state.view==='rewards')renderRewards();
+  else if(state.view==='rewards')renderRewards();
   else if(state.view==='notifications')renderNotifications();
   else renderAccount();
 }
@@ -421,6 +422,7 @@ async function renderAccount(){
     <div class="toolbar">
       <button class="btn" onclick="M4X.topup()">+ Nạp tiền</button>
       <button class="btn ghost" onclick="M4X.redeemCode()">Nhập code</button>
+      <button class="btn ghost" onclick="M4X.redeemCode()">Nhập code</button>
       ${state.profile?.role==='admin'?'<button class="btn ghost" onclick="location.href=\'./admin.html\'">Quản trị</button>':''}
       <button class="btn ghost" onclick="M4X.editProfile()">Sửa tài khoản</button>
       <button class="btn ghost" onclick="M4X.checkUpdate(true)">Kiểm tra cập nhật</button>
@@ -484,7 +486,7 @@ function policy(type){
 }
 Object.assign(window.M4X,{
   product,action,auth,login,register,forgot,logout,buy,topup,makeTopup,download,
-  readNotif,readAll,editProfile,saveName,changePass,checkUpdate,policy,redeemCode,submitGiftCode,completeTask,claimCheckin,watchRewardedAd
+  readNotif,readAll,editProfile,saveName,changePass,checkUpdate,policy,redeemCode,submitGiftCode,completeTask,claimCheckin,watchRewardedAd,redeemCode,submitGiftCode,completeTask,claimCheckin,watchRewardedAd
 });
 document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 $('accountQuick').onclick=()=>setView('account');
