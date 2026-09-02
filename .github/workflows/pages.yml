@@ -33,6 +33,25 @@ jobs:
           test -n "$SUPABASE_URL" || (echo "Missing SUPABASE_URL" && exit 1)
           test -n "$SUPABASE_ANON_KEY" || (echo "Missing SUPABASE_ANON_KEY" && exit 1)
 
+      - name: Test Supabase connection
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          case "$SUPABASE_URL" in
+            https://*.supabase.co) ;;
+            *) echo "SUPABASE_URL không đúng định dạng"; exit 1 ;;
+          esac
+
+          HTTP_CODE="$(curl -sS -o /tmp/m4x_supabase_check.txt -w "%{http_code}"             "$SUPABASE_URL/rest/v1/"             -H "apikey: $SUPABASE_ANON_KEY"             -H "Authorization: Bearer $SUPABASE_ANON_KEY")"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Không kết nối được Supabase bằng GitHub Secrets. HTTP=$HTTP_CODE"
+            exit 1
+          fi
+
+          echo "Supabase connection OK"
+
       - name: Build static site
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -40,7 +59,6 @@ jobs:
         run: |
           rm -rf _site
           mkdir -p _site
-
           cp index.html admin.html _site/
           cp -r assets _site/assets
 
