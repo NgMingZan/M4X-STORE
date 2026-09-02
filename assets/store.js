@@ -39,7 +39,13 @@ async function loadOwned(){
     .eq('status','paid')
     .order('paid_at',{ascending:false});
   if(error){console.warn(error);return}
-  for(const o of data||[]) if(o.product_id&&!state.owned.has(o.product_id)) state.owned.set(o.product_id,o);
+  for(const o of data||[]){
+    // Chỉ file tải xuống là sản phẩm sở hữu vĩnh viễn / mua 1 lần.
+    // Nội dung premium, license, dịch vụ, VIP/subscription, link ngoài được mua lại.
+    if(o.product_id && o.products?.delivery_type==='download' && !state.owned.has(o.product_id)){
+      state.owned.set(o.product_id,o);
+    }
+  }
 }
 async function loadProducts(){
   const [{data:c},{data:p}]=await Promise.all([
@@ -301,7 +307,7 @@ function renderLibrary(){
   }
   const arr=[...state.owned.values()];
   $('view').innerHTML=`<div class="sectionTitle">Thư viện của tôi</div>
-    <p class="muted">Sản phẩm đã mua được tải lại và nhận bản cập nhật miễn phí.</p>
+    <p class="muted">File tải xuống đã mua được tải lại và nhận bản cập nhật miễn phí.</p>
     ${arr.map(o=>{
       const p=state.products.find(x=>x.id===o.product_id)||o.products||{};
       const latest=p.version_name||o.products?.version_name||'—';
