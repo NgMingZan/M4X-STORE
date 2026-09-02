@@ -29,6 +29,7 @@ jobs:
         run: |
           mkdir -p android-app/app/src/main/assets
           cp index.html android-app/app/src/main/assets/index.html
+          cp admin.html android-app/app/src/main/assets/admin.html
           cat > android-app/app/src/main/assets/config.js <<EOF2
           window.M4X_CONFIG = {
             SUPABASE_URL: "$SUPABASE_URL",
