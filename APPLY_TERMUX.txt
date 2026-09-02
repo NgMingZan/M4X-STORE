@@ -1,0 +1,20 @@
+M4X STORE -> Android app patch
+
+1) Đưa ZIP vào Download.
+2) Termux:
+
+cd ~/M4X_STORE/M4X_STORE_V2
+unzip -o ~/storage/downloads/M4X_STORE_ANDROID_APP_PATCH.zip -d .
+
+git add android-app .github/workflows/android-build.yml
+git commit -m "Add M4X STORE Android app"
+git push
+
+3) GitHub repo -> Settings -> Secrets and variables -> Actions -> New repository secret
+Tạo:
+SUPABASE_URL = URL project Supabase
+SUPABASE_ANON_KEY = Publishable key (sb_publishable_...)
+
+4) GitHub repo -> Actions -> Build M4X STORE APK -> Run workflow
+
+5) Khi build xanh -> mở run -> Artifacts -> M4X-STORE-APK -> tải APK.

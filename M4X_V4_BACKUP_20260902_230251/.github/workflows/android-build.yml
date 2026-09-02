@@ -1,0 +1,76 @@
+name: Build M4X STORE APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate config
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$SUPABASE_URL" || (echo "Missing Actions secret SUPABASE_URL" && exit 1)
+          test -n "$SUPABASE_ANON_KEY" || (echo "Missing Actions secret SUPABASE_ANON_KEY" && exit 1)
+
+      - name: Prepare local storefront assets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          mkdir -p android-app/app/src/main/assets
+          cp index.html android-app/app/src/main/assets/index.html
+          cp admin.html android-app/app/src/main/assets/admin.html
+          cat > android-app/app/src/main/assets/config.js <<EOF2
+          window.M4X_CONFIG = {
+            SUPABASE_URL: "$SUPABASE_URL",
+            SUPABASE_ANON_KEY: "$SUPABASE_ANON_KEY",
+            BANK: {
+              name: "VietinBank",
+              account: "106885804727",
+              holder: "NGUYEN MINH DAN",
+              store: "M4X STORE"
+            },
+            ORDER_EXPIRE_MINUTES: 15
+          };
+          EOF2
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build APK
+        working-directory: android-app
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Rename APK
+        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk M4X_STORE_v1.0.0.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: M4X-STORE-APK
+          path: M4X_STORE_v1.0.0.apk
+          if-no-files-found: error

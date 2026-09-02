@@ -2,9 +2,27 @@ name: Build M4X STORE APK
 
 on:
   workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Phiên bản, ví dụ 2.0.0"
+        required: true
+        default: "2.0.0"
+      version_code:
+        description: "Version code, phải tăng dần"
+        required: true
+        default: "200"
+      publish_release:
+        description: "Xuất bản GitHub Release (cần keystore secrets)"
+        type: boolean
+        required: true
+        default: false
+      release_notes:
+        description: "Ghi chú cập nhật"
+        required: false
+        default: "Cập nhật M4X STORE"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -14,22 +32,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate config
+      - name: Validate Supabase config
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          test -n "$SUPABASE_URL" || (echo "Missing Actions secret SUPABASE_URL" && exit 1)
-          test -n "$SUPABASE_ANON_KEY" || (echo "Missing Actions secret SUPABASE_ANON_KEY" && exit 1)
+          test -n "$SUPABASE_URL" || (echo "Missing SUPABASE_URL" && exit 1)
+          test -n "$SUPABASE_ANON_KEY" || (echo "Missing SUPABASE_ANON_KEY" && exit 1)
 
       - name: Prepare local storefront assets
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
         run: |
-          mkdir -p android-app/app/src/main/assets
-          cp index.html android-app/app/src/main/assets/index.html
-          cp admin.html android-app/app/src/main/assets/admin.html
+          rm -rf android-app/app/src/main/assets
+          mkdir -p android-app/app/src/main/assets/assets
+          cp index.html admin.html android-app/app/src/main/assets/
+          cp -r assets/* android-app/app/src/main/assets/assets/
           cat > android-app/app/src/main/assets/config.js <<EOF2
           window.M4X_CONFIG = {
             SUPABASE_URL: "$SUPABASE_URL",
@@ -40,7 +61,10 @@ jobs:
               holder: "NGUYEN MINH DAN",
               store: "M4X STORE"
             },
-            ORDER_EXPIRE_MINUTES: 15
+            ORDER_EXPIRE_MINUTES: 15,
+            APP_VERSION_NAME: "$VERSION_NAME",
+            APP_VERSION_CODE: Number("$VERSION_CODE"),
+            GITHUB_REPO: "NgMingZan/M4X-STORE"
           };
           EOF2
 
@@ -61,16 +85,65 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build APK
+      - name: Prepare stable signing key
+        if: ${{ inputs.publish_release }}
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64" || (echo "Missing ANDROID_KEYSTORE_BASE64" && exit 1)
+          test -n "$STORE_PASS" || (echo "Missing ANDROID_KEYSTORE_PASSWORD" && exit 1)
+          test -n "$KEY_ALIAS" || (echo "Missing ANDROID_KEY_ALIAS" && exit 1)
+          test -n "$KEY_PASS" || (echo "Missing ANDROID_KEY_PASSWORD" && exit 1)
+          echo "$KEYSTORE_B64" | base64 -d > android-app/m4x-release.jks
+
+      - name: Build test APK
+        if: ${{ !inputs.publish_release }}
         working-directory: android-app
+        env:
+          M4X_VERSION_NAME: ${{ inputs.version_name }}
+          M4X_VERSION_CODE: ${{ inputs.version_code }}
         run: gradle :app:assembleDebug --stacktrace
 
-      - name: Rename APK
-        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk M4X_STORE_v1.0.0.apk
+      - name: Build signed release APK
+        if: ${{ inputs.publish_release }}
+        working-directory: android-app
+        env:
+          M4X_VERSION_NAME: ${{ inputs.version_name }}
+          M4X_VERSION_CODE: ${{ inputs.version_code }}
+          M4X_KEYSTORE_PATH: ${{ github.workspace }}/android-app/m4x-release.jks
+          M4X_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          M4X_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          M4X_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle :app:assembleRelease --stacktrace
 
-      - name: Upload APK
+      - name: Rename test APK
+        if: ${{ !inputs.publish_release }}
+        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk M4X_STORE.apk
+
+      - name: Rename signed APK
+        if: ${{ inputs.publish_release }}
+        run: cp android-app/app/build/outputs/apk/release/app-release.apk M4X_STORE.apk
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: M4X-STORE-APK
-          path: M4X_STORE_v1.0.0.apk
+          name: M4X-STORE-${{ inputs.version_name }}
+          path: M4X_STORE.apk
           if-no-files-found: error
+
+      - name: Publish or update GitHub Release
+        if: ${{ inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ inputs.version_name }}
+          NOTES: ${{ inputs.release_notes }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" M4X_STORE.apk --clobber
+            gh release edit "$TAG" --title "M4X STORE $TAG" --notes "$NOTES" --latest
+          else
+            gh release create "$TAG" M4X_STORE.apk --title "M4X STORE $TAG" --notes "$NOTES" --latest
+          fi
