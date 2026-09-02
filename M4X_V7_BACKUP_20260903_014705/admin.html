@@ -40,7 +40,6 @@
     <button type="button" class="tab" data-tab="notices">Thông báo</button>
     <button type="button" class="tab" data-tab="codes">Gift code</button>
     <button type="button" class="tab" data-tab="tasks">Nhiệm vụ</button>
-    <button type="button" class="tab" data-tab="support">Hỗ trợ</button>
     <button type="button" class="tab" data-tab="security">Bảo mật</button>
     <button type="button" class="tab" data-tab="appinfo">Ứng dụng</button>
   </nav>
@@ -221,21 +220,11 @@
     </div>
   </section>
 
-  <section id="support" class="panel">
-    <div class="sectionTitle">Ticket hỗ trợ</div>
-    <input id="supportSearch" class="search" placeholder="Tìm ticket / user / mã đơn...">
-    <div id="supportList"></div>
-  </section>
-
   <section id="security" class="panel">
     <div class="sectionTitle">Download gần đây</div>
     <div id="downloadList"></div>
     <div class="sectionTitle">Sự kiện bảo mật</div>
     <div id="securityList"></div>
-    <div class="sectionTitle">Chống gian lận Rewards</div>
-    <div id="rewardSecurityList"></div>
-    <div class="sectionTitle">Tài khoản đang khóa thưởng</div>
-    <div id="rewardBlockedList"></div>
   </section>
 
   <section id="appinfo" class="panel">
@@ -247,12 +236,6 @@
   </section>
 </div>
 
-<div id="modal" class="modal">
-  <div class="sheet">
-    <button type="button" class="btn ghost close" onclick="document.getElementById('modal').classList.remove('open')">Đóng</button>
-    <div id="modalContent"></div>
-  </div>
-</div>
 <script src="./assets/admin.js"></script>
 </body>
 </html>

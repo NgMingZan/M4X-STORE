@@ -12,7 +12,7 @@ const money=n=>new Intl.NumberFormat('vi-VN').format(Number(n||0))+'đ';
 const dt=v=>v?new Date(v).toLocaleString('vi-VN'):'';
 const slugify=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/đ/g,'d').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 
-const st={cats:[],products:[],orders:[],users:[],topups:[],notices:[],downloads:[],security:[],giftCodes:[],tasks:[],tickets:[],rewardSecurity:[]};
+const st={cats:[],products:[],orders:[],users:[],topups:[],notices:[],downloads:[],security:[],giftCodes:[],tasks:[]};
 let booting=false;
 
 function showLogin(message=''){
@@ -99,7 +99,7 @@ async function boot(){
 }
 async function refresh(){
   await Promise.all([loadCats(),loadUsers(),loadProducts()]);
-  await Promise.all([loadOrders(),loadTopups(),loadNotices(),loadSecurity(),loadGiftCodes(),loadTasks(),loadSupport(),loadRewardSecurity()]);
+  await Promise.all([loadOrders(),loadTopups(),loadNotices(),loadSecurity(),loadGiftCodes(),loadTasks()]);
   renderStats();
 }
 
@@ -330,7 +330,7 @@ async function deleteProduct(id){
 
 async function loadUsers(){
   const {data,error}=await sb.from('profiles')
-    .select('id,display_name,balance,role,is_blocked,blocked_reason,rewards_blocked,rewards_blocked_reason,created_at')
+    .select('id,display_name,balance,role,is_blocked,blocked_reason,created_at')
     .order('created_at',{ascending:false});
 
   if(error)throw error;
@@ -350,7 +350,7 @@ function renderUsers(){
         <div>
           <b>${esc(u.display_name||u.id.slice(0,8))}</b>
           <div class="muted">${esc(u.role)} · ${esc(u.id)}</div>
-          ${u.is_blocked?`<div class="badtxt">Đang khóa · ${esc(u.blocked_reason||'')}</div>`:''}${u.rewards_blocked?`<div class="badtxt">🛡️ Khóa thưởng · ${esc(u.rewards_blocked_reason||'')}</div>`:''}
+          ${u.is_blocked?`<div class="badtxt">Đang khóa · ${esc(u.blocked_reason||'')}</div>`:''}
         </div>
         <div><b>${money(u.balance||0)}</b></div>
       </div>
@@ -538,83 +538,26 @@ async function loadTasks(){
 function taskTypeChanged(){
   const type=$('taskType').value;
   if(type==='rewarded_ad'){$('taskReward').value='1000';$('taskDaily').value='3'}
-  else if(type==='link'){$('taskReward').value='2000';$('taskDaily').value='5'}
+  else if(type==='link'){$('taskReward').value='2000';$('taskDaily').value='1'}
 }
 async function createTask(){
-  const {error}=await sb.rpc('admin_create_reward_task',{
-    p_title:$('taskTitle').value.trim(),
-    p_description:$('taskDesc').value.trim(),
-    p_task_type:$('taskType').value,
-    p_reward_amount:Number($('taskReward').value||0),
-    p_destination_url:$('taskUrl').value.trim()||null,
-    p_completion_code:$('taskCode').value.trim()||null,
-    p_daily_limit:Number($('taskDaily').value||1)
-  });
-  $('taskMsg').textContent=error?error.message:'Đã tạo nhiệm vụ an toàn.';
-  if(!error){$('taskTitle').value='';$('taskCode').value='';await loadTasks()}
+  const payload={
+    title:$('taskTitle').value.trim(),
+    description:$('taskDesc').value.trim(),
+    task_type:$('taskType').value,
+    reward_amount:Number($('taskReward').value||0),
+    destination_url:$('taskUrl').value.trim()||null,
+    completion_code:$('taskCode').value.trim()||null,
+    daily_limit:Number($('taskDaily').value||1),
+    active:true
+  };
+  const {error}=await sb.from('reward_tasks').insert(payload);
+  $('taskMsg').textContent=error?error.message:'Đã tạo nhiệm vụ.';
+  if(!error){$('taskTitle').value='';await loadTasks()}
 }
 async function toggleTask(id,v){
   const {error}=await sb.from('reward_tasks').update({active:v}).eq('id',id);
   if(error)alert(error.message);else loadTasks();
-}
-
-
-const ticketStatusText=s=>({open:'Mới',in_progress:'Đang xử lý',resolved:'Đã xử lý',closed:'Đã đóng'}[s]||s||'—');
-
-async function loadSupport(){
-  const {data,error}=await sb.from('support_tickets').select('*,orders(order_code,products(name))').order('updated_at',{ascending:false}).limit(300);
-  if(error){console.warn(error);return;}
-  st.tickets=data||[];
-  renderSupport();
-}
-function renderSupport(){
-  const box=$('supportList'); if(!box)return;
-  const q=($('supportSearch')?.value||'').toLowerCase().trim();
-  const arr=st.tickets.filter(t=>!q||`${t.ticket_code} ${t.subject} ${userName(t.user_id)} ${t.orders?.order_code||''}`.toLowerCase().includes(q));
-  box.innerHTML=arr.map(t=>`<div class="item"><div class="row"><div><b>${esc(t.subject)}</b><div class="muted">${esc(t.ticket_code)} · ${esc(userName(t.user_id))}${t.orders?.order_code?' · '+esc(t.orders.order_code):''}</div></div><span class="statusTag ${esc(t.status)}">${esc(ticketStatusText(t.status))}</span></div><div class="muted">${dt(t.updated_at)}</div><button class="btn ghost" onclick="ADM.openSupportTicket('${t.id}')">Mở ticket</button></div>`).join('')||'<div class="muted">Chưa có ticket.</div>';
-}
-async function adminSignedSupportImage(path){
-  if(!path)return null;
-  const {data,error}=await sb.storage.from('support-images').createSignedUrl(path,300);
-  return error?null:data?.signedUrl;
-}
-async function openSupportTicket(id){
-  const [{data:t,error:te},{data:m,error:me}]=await Promise.all([
-    sb.from('support_tickets').select('*,orders(order_code,products(name))').eq('id',id).single(),
-    sb.from('support_messages').select('*').eq('ticket_id',id).order('created_at')
-  ]);
-  if(te||me){alert(te?.message||me?.message);return;}
-  const messages=await Promise.all((m||[]).map(async x=>({...x,image:x.attachment_path?await adminSignedSupportImage(x.attachment_path):null})));
-  $('modalContent').innerHTML=`<h2>${esc(t.subject)}</h2><div class="muted">${esc(t.ticket_code)} · ${esc(userName(t.user_id))}${t.orders?.order_code?' · '+esc(t.orders.order_code):''}</div>
-    <div class="toolbar"><button class="btn ghost" onclick="ADM.setSupportStatus('${t.id}','open')">Mới</button><button class="btn ghost" onclick="ADM.setSupportStatus('${t.id}','in_progress')">Đang xử lý</button><button class="btn okbtn" onclick="ADM.setSupportStatus('${t.id}','resolved')">Đã xử lý</button><button class="btn bad" onclick="ADM.setSupportStatus('${t.id}','closed')">Đóng</button></div>
-    <div class="ticketChat">${messages.map(x=>`<div class="ticketMsg ${x.sender_role==='admin'?'admin':'user'}"><b>${x.sender_role==='admin'?'M4X Admin':esc(userName(x.sender_id))}</b>${x.message?`<div>${esc(x.message)}</div>`:''}${x.image?`<img src="${esc(x.image)}" class="ticketImage">`:''}<div class="muted">${dt(x.created_at)}</div></div>`).join('')}</div>
-    <textarea id="adminTicketReply" class="textarea" placeholder="Trả lời khách hàng..."></textarea><button class="btn" onclick="ADM.replySupportTicket('${t.id}')">Gửi phản hồi</button>`;
-  $('modal').classList.add('open');
-}
-async function replySupportTicket(id){
-  const msg=$('adminTicketReply')?.value.trim(); if(!msg)return;
-  const {error}=await sb.rpc('send_support_message',{p_ticket_id:id,p_message:msg,p_attachment_path:null});
-  if(error)alert(error.message); else{await Promise.all([loadSupport(),loadNotices()]);openSupportTicket(id);}
-}
-async function setSupportStatus(id,status){
-  const {error}=await sb.rpc('admin_set_ticket_status',{p_ticket_id:id,p_status:status});
-  if(error)alert(error.message); else{await Promise.all([loadSupport(),loadNotices()]);openSupportTicket(id);}
-}
-
-async function loadRewardSecurity(){
-  const {data,error}=await sb.from('reward_security_events').select('*').order('created_at',{ascending:false}).limit(200);
-  if(error){console.warn(error);return;}
-  st.rewardSecurity=data||[];
-  const box=$('rewardSecurityList');
-  if(box)box.innerHTML=st.rewardSecurity.map(x=>`<div class="item"><div class="row"><b>${esc(x.event_type)}</b><b class="badtxt">Risk ${Number(x.risk_score||0)}</b></div><div>${esc(x.detail||'')}</div><div class="muted">${esc(userName(x.user_id))} · ${dt(x.created_at)} · Device ${esc((x.device_hash||'—').slice(0,12))} · IP ${esc((x.ip_hash||'—').slice(0,12))}</div></div>`).join('')||'<div class="muted">Chưa phát hiện gian lận Rewards.</div>';
-  const blocked=st.users.filter(u=>u.rewards_blocked);
-  const bb=$('rewardBlockedList');
-  if(bb)bb.innerHTML=blocked.map(u=>`<div class="item"><div class="row"><div><b>${esc(u.display_name||u.id.slice(0,8))}</b><div class="badtxt">${esc(u.rewards_blocked_reason||'Đang khóa thưởng')}</div></div><button class="btn okbtn" onclick="ADM.setRewardsBlocked('${u.id}',false)">Mở khóa thưởng</button></div></div>`).join('')||'<div class="muted">Không có tài khoản bị khóa thưởng.</div>';
-}
-async function setRewardsBlocked(id,blocked){
-  const reason=blocked?(prompt('Lý do khóa thưởng:','Phát hiện farm nhiệm vụ')||'Phát hiện farm nhiệm vụ'):null;
-  const {error}=await sb.rpc('admin_set_rewards_blocked',{p_user_id:id,p_blocked:blocked,p_reason:reason});
-  if(error)alert(error.message); else await Promise.all([loadUsers(),loadRewardSecurity(),loadNotices()]);
 }
 
 async function loadSecurity(){
@@ -675,17 +618,14 @@ function renderStats(){
 Object.assign(window.ADM,{
   login,logout,refresh,toggleStock,addCategory,deleteCategory,
   saveProduct,editProduct,resetProductForm,toggleProduct,deleteProduct,
-  adjustBalance,setBlocked,refund,broadcast,createGiftCode,toggleGiftCode,
-  taskTypeChanged,createTask,toggleTask,
-  openSupportTicket,replySupportTicket,setSupportStatus,setRewardsBlocked
+  adjustBalance,setBlocked,refund,broadcast,createGiftCode,toggleGiftCode,taskTypeChanged,createTask,toggleTask,createGiftCode,toggleGiftCode,taskTypeChanged,createTask,toggleTask
 });
 
 for(const [id,fn] of [
   ['productSearch',renderProducts],
   ['userSearch',renderUsers],
   ['orderSearch',renderOrders],
-  ['topupSearch',renderTopups],
-  ['supportSearch',renderSupport]
+  ['topupSearch',renderTopups]
 ]){
   const el=$(id);
   if(el)el.oninput=fn;

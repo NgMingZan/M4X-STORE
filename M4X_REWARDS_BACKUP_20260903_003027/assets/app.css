@@ -27,7 +27,7 @@ a{color:inherit}
 .cats,.tabs{display:flex;gap:8px;overflow:auto;padding:14px 0}
 .chip,.tab{white-space:nowrap;border:1px solid var(--line);background:rgba(255,255,255,.065);color:#ddd;padding:9px 13px;border-radius:999px}
 .chip.active,.tab.active{background:#fff;color:#090b10}
-.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .card{border:1px solid var(--line);background:linear-gradient(150deg,rgba(255,255,255,.1),rgba(255,255,255,.035));border-radius:22px;overflow:hidden}
 .cover{aspect-ratio:1.25;background:#171b25 center/cover no-repeat;position:relative}
 .pill{position:absolute;left:10px;top:10px;background:rgba(0,0,0,.62);padding:6px 9px;border-radius:999px;font-size:12px}
@@ -42,7 +42,7 @@ a{color:inherit}
 .gallery{display:flex;gap:8px;overflow:auto;margin:12px 0}.gallery img{width:220px;aspect-ratio:16/10;object-fit:cover;border-radius:16px;border:1px solid var(--line)}
 .meta{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}.meta>div{background:#0d1118;border:1px solid var(--line);border-radius:14px;padding:11px}
 .notice{padding:12px;border-radius:14px;border:1px solid #4d4124;background:#241f12;color:#ffe6a5;margin:10px 0}
-.bottomnav{position:fixed;left:50%;transform:translateX(-50%);bottom:10px;width:min(620px,calc(100% - 20px));z-index:50;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;background:rgba(15,18,25,.92);backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:20px;padding:7px}
+.bottomnav{position:fixed;left:50%;transform:translateX(-50%);bottom:10px;width:min(620px,calc(100% - 20px));z-index:50;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:rgba(15,18,25,.92);backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:20px;padding:7px}
 .navbtn{border:0;background:transparent;color:var(--muted);padding:10px 4px;border-radius:14px;font-weight:800}.navbtn.active{background:#fff;color:#090b10}
 .badge{display:inline-flex;min-width:20px;height:20px;border-radius:999px;background:#ff5964;color:#fff;align-items:center;justify-content:center;padding:0 6px;font-size:11px}
 .updatebar{display:none;padding:11px 13px;background:#15271f;border:1px solid #315c48;border-radius:15px;margin:8px 0}.updatebar.show{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -57,18 +57,3 @@ hr{border:0;border-top:1px solid var(--line);margin:18px 0}
 @media(max-width:850px){.grid{grid-template-columns:repeat(2,1fr)}.statgrid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:700px){.grid2{grid-template-columns:1fr}.hero{padding-top:22px}.top{align-items:flex-start}.adminTop{flex-direction:column;align-items:flex-start!important}.meta{grid-template-columns:1fr}.gallery img{width:180px}}
 @media(max-width:500px){.grid{grid-template-columns:1fr 1fr;gap:8px}.wrap{padding:10px 10px 96px}.cardbody{padding:10px}.name,.price{font-size:14px}.hero h1{letter-spacing:-2px}.sheet{padding:17px}}
-
-
-/* M4X V7 - Order history / Invoice / Support */
-.statusTag{display:inline-flex;align-items:center;padding:6px 9px;border-radius:999px;border:1px solid var(--line);font-size:12px;font-weight:850;white-space:nowrap}
-.statusTag.paid,.statusTag.resolved{background:rgba(45,160,115,.16);color:var(--ok)}
-.statusTag.pending,.statusTag.review,.statusTag.in_progress,.statusTag.open{background:rgba(255,203,92,.12);color:var(--warn)}
-.statusTag.refunded,.statusTag.cancelled,.statusTag.closed,.statusTag.expired{background:rgba(255,90,100,.12);color:var(--bad)}
-.orderCard .meta{grid-template-columns:repeat(2,minmax(0,1fr))}
-.invoice{padding:4px}.invoiceBrand{font-size:28px;font-weight:950;letter-spacing:-1px}
-.invoiceRow,.invoiceTotal{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--line)}
-.invoiceTotal{font-size:20px;border-bottom:0}
-.ticketChat{display:flex;flex-direction:column;gap:9px;margin:14px 0}
-.ticketMsg{max-width:86%;padding:11px 12px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.055)}
-.ticketMsg.user{align-self:flex-end}.ticketMsg.admin{align-self:flex-start;background:rgba(109,90,255,.12)}
-.ticketImage{display:block;width:min(320px,100%);max-height:360px;object-fit:contain;border-radius:12px;margin-top:8px;border:1px solid var(--line)}

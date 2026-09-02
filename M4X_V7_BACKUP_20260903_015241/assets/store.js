@@ -404,76 +404,6 @@ async function secureReward(body){
   }
   return d;
 }
-async function rewardDeviceId(){
-  try{
-    if(window.M4XDevice&&typeof window.M4XDevice.getId==='function'){
-      const v=String(window.M4XDevice.getId()||'').trim();
-      if(v.length>=8)return 'android:'+v;
-    }
-  }catch{}
-  let id=localStorage.getItem('m4x_reward_device_id');
-  if(!id){
-    id=(crypto.randomUUID?crypto.randomUUID():('web-'+Date.now()+'-'+Math.random().toString(16).slice(2)));
-    localStorage.setItem('m4x_reward_device_id',id);
-  }
-  return 'web:'+id;
-}
-async function secureReward(body){
-  const session=(await sb.auth.getSession()).data.session;
-  if(!session)throw new Error('Bạn cần đăng nhập lại');
-  body.device_id=await rewardDeviceId();
-  const r=await fetch(`${C.SUPABASE_URL}/functions/v1/claim-reward`,{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'apikey':C.SUPABASE_ANON_KEY,
-      'Authorization':'Bearer '+session.access_token
-    },
-    body:JSON.stringify(body)
-  });
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.error||'Không xác minh được nhiệm vụ');
-  if(d?.blocked){
-    await loadAuth();
-    throw new Error(d.message||'Tính năng nhận thưởng đã bị tạm khóa');
-  }
-  return d;
-}
-async function rewardDeviceId(){
-  try{
-    if(window.M4XDevice&&typeof window.M4XDevice.getId==='function'){
-      const v=String(window.M4XDevice.getId()||'').trim();
-      if(v.length>=8)return 'android:'+v;
-    }
-  }catch{}
-  let id=localStorage.getItem('m4x_reward_device_id');
-  if(!id){
-    id=(crypto.randomUUID?crypto.randomUUID():('web-'+Date.now()+'-'+Math.random().toString(16).slice(2)));
-    localStorage.setItem('m4x_reward_device_id',id);
-  }
-  return 'web:'+id;
-}
-async function secureReward(body){
-  const session=(await sb.auth.getSession()).data.session;
-  if(!session)throw new Error('Bạn cần đăng nhập lại');
-  body.device_id=await rewardDeviceId();
-  const r=await fetch(`${C.SUPABASE_URL}/functions/v1/claim-reward`,{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'apikey':C.SUPABASE_ANON_KEY,
-      'Authorization':'Bearer '+session.access_token
-    },
-    body:JSON.stringify(body)
-  });
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.error||'Không xác minh được nhiệm vụ');
-  if(d?.blocked){
-    await loadAuth();
-    throw new Error(d.message||'Tính năng nhận thưởng đã bị tạm khóa');
-  }
-  return d;
-}
 async function completeTask(id){
   const t=state.tasks.find(x=>x.id===id); if(!t)return;
   let code=null;
@@ -506,8 +436,6 @@ async function claimCheckin(){
     renderRewards();
   }
 }
-
-
 
 
 function watchRewardedAd(taskId){

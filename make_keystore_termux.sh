@@ -9,7 +9,7 @@ echo "=== M4X STORE - TẠO KHÓA KÝ ỔN ĐỊNH ==="
 echo "Khóa này phải giữ lâu dài. Mất khóa sẽ không thể cập nhật đè app đã phát hành."
 echo
 
-pkg install openjdk-17 coreutils -y
+pkg install openjdk-21 coreutils -y
 
 if [ -f "$KS" ]; then
   echo "Đã có $KS - không ghi đè."

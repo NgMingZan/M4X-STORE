@@ -22,7 +22,7 @@ async function loadAuth(){
   const {data:{user}}=await sb.auth.getUser();
   state.me=user||null;
   if(state.me){
-    const {data}=await sb.from('profiles').select('id,display_name,balance,role,is_blocked,blocked_reason,rewards_blocked,rewards_blocked_reason').eq('id',state.me.id).single();
+    const {data}=await sb.from('profiles').select('id,display_name,balance,role,is_blocked,blocked_reason').eq('id',state.me.id).single();
     state.profile=data||null;
     $('accountQuick').textContent=`${state.profile?.display_name||'Tài khoản'} · ${money(state.profile?.balance||0)}`;
   }else{
@@ -39,13 +39,7 @@ async function loadOwned(){
     .eq('status','paid')
     .order('paid_at',{ascending:false});
   if(error){console.warn(error);return}
-  for(const o of data||[]){
-    // Chỉ file tải xuống là sản phẩm sở hữu vĩnh viễn / mua 1 lần.
-    // Nội dung premium, license, dịch vụ, VIP/subscription, link ngoài được mua lại.
-    if(o.product_id && o.products?.delivery_type==='download' && !state.owned.has(o.product_id)){
-      state.owned.set(o.product_id,o);
-    }
-  }
+  for(const o of data||[]) if(o.product_id&&!state.owned.has(o.product_id)) state.owned.set(o.product_id,o);
 }
 async function loadProducts(){
   const [{data:c},{data:p}]=await Promise.all([
@@ -307,7 +301,7 @@ function renderLibrary(){
   }
   const arr=[...state.owned.values()];
   $('view').innerHTML=`<div class="sectionTitle">Thư viện của tôi</div>
-    <p class="muted">File tải xuống đã mua được tải lại và nhận bản cập nhật miễn phí.</p>
+    <p class="muted">Sản phẩm đã mua được tải lại và nhận bản cập nhật miễn phí.</p>
     ${arr.map(o=>{
       const p=state.products.find(x=>x.id===o.product_id)||o.products||{};
       const latest=p.version_name||o.products?.version_name||'—';
@@ -343,10 +337,6 @@ async function renderRewards(){
     $('view').innerHTML='<div class="sectionTitle">Nhiệm vụ kiếm thưởng</div><div class="item"><p class="muted">Đăng nhập để làm nhiệm vụ.</p><button class="btn" onclick="M4X.auth(\'login\')">Đăng nhập</button></div>';
     return;
   }
-  if(state.profile?.rewards_blocked){
-    $('view').innerHTML='<div class="sectionTitle">Nhiệm vụ kiếm thưởng</div><div class="item"><b class="badtxt">🛡️ Nhận thưởng đang bị tạm khóa</b><div class="muted">'+esc(state.profile.rewards_blocked_reason||'Hệ thống phát hiện hoạt động bất thường. Vui lòng liên hệ Admin.')+'</div><div class="toolbar"><button class="btn ghost" onclick="M4X.supportCenter()">Liên hệ hỗ trợ</button></div></div>';
-    return;
-  }
   await loadRewardTasks();
   const {data:ci}=await sb.rpc('get_checkin_status');
   const checkinHtml='<div class="item"><div class="row"><div><b>🔥 Check-in 7 ngày</b><div class="muted">'+
@@ -369,111 +359,6 @@ async function submitGiftCode(){
   $('giftMsg').textContent=error?error.message:'Nhận quà thành công!';
   if(!error){await Promise.all([loadAuth(),loadOwned(),loadNotifications()]);setTimeout(()=>{closeModal();setView('account')},700)}
 }
-async function rewardDeviceId(){
-  try{
-    if(window.M4XDevice&&typeof window.M4XDevice.getId==='function'){
-      const v=String(window.M4XDevice.getId()||'').trim();
-      if(v.length>=8)return 'android:'+v;
-    }
-  }catch{}
-  let id=localStorage.getItem('m4x_reward_device_id');
-  if(!id){
-    id=(crypto.randomUUID?crypto.randomUUID():('web-'+Date.now()+'-'+Math.random().toString(16).slice(2)));
-    localStorage.setItem('m4x_reward_device_id',id);
-  }
-  return 'web:'+id;
-}
-async function secureReward(body){
-  const session=(await sb.auth.getSession()).data.session;
-  if(!session)throw new Error('Bạn cần đăng nhập lại');
-  body.device_id=await rewardDeviceId();
-  const r=await fetch(`${C.SUPABASE_URL}/functions/v1/claim-reward`,{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'apikey':C.SUPABASE_ANON_KEY,
-      'Authorization':'Bearer '+session.access_token
-    },
-    body:JSON.stringify(body)
-  });
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.error||'Không xác minh được nhiệm vụ');
-  if(d?.blocked){
-    await loadAuth();
-    throw new Error(d.message||'Tính năng nhận thưởng đã bị tạm khóa');
-  }
-  return d;
-}
-async function rewardDeviceId(){
-  try{
-    if(window.M4XDevice&&typeof window.M4XDevice.getId==='function'){
-      const v=String(window.M4XDevice.getId()||'').trim();
-      if(v.length>=8)return 'android:'+v;
-    }
-  }catch{}
-  let id=localStorage.getItem('m4x_reward_device_id');
-  if(!id){
-    id=(crypto.randomUUID?crypto.randomUUID():('web-'+Date.now()+'-'+Math.random().toString(16).slice(2)));
-    localStorage.setItem('m4x_reward_device_id',id);
-  }
-  return 'web:'+id;
-}
-async function secureReward(body){
-  const session=(await sb.auth.getSession()).data.session;
-  if(!session)throw new Error('Bạn cần đăng nhập lại');
-  body.device_id=await rewardDeviceId();
-  const r=await fetch(`${C.SUPABASE_URL}/functions/v1/claim-reward`,{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'apikey':C.SUPABASE_ANON_KEY,
-      'Authorization':'Bearer '+session.access_token
-    },
-    body:JSON.stringify(body)
-  });
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.error||'Không xác minh được nhiệm vụ');
-  if(d?.blocked){
-    await loadAuth();
-    throw new Error(d.message||'Tính năng nhận thưởng đã bị tạm khóa');
-  }
-  return d;
-}
-async function rewardDeviceId(){
-  try{
-    if(window.M4XDevice&&typeof window.M4XDevice.getId==='function'){
-      const v=String(window.M4XDevice.getId()||'').trim();
-      if(v.length>=8)return 'android:'+v;
-    }
-  }catch{}
-  let id=localStorage.getItem('m4x_reward_device_id');
-  if(!id){
-    id=(crypto.randomUUID?crypto.randomUUID():('web-'+Date.now()+'-'+Math.random().toString(16).slice(2)));
-    localStorage.setItem('m4x_reward_device_id',id);
-  }
-  return 'web:'+id;
-}
-async function secureReward(body){
-  const session=(await sb.auth.getSession()).data.session;
-  if(!session)throw new Error('Bạn cần đăng nhập lại');
-  body.device_id=await rewardDeviceId();
-  const r=await fetch(`${C.SUPABASE_URL}/functions/v1/claim-reward`,{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'apikey':C.SUPABASE_ANON_KEY,
-      'Authorization':'Bearer '+session.access_token
-    },
-    body:JSON.stringify(body)
-  });
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.error||'Không xác minh được nhiệm vụ');
-  if(d?.blocked){
-    await loadAuth();
-    throw new Error(d.message||'Tính năng nhận thưởng đã bị tạm khóa');
-  }
-  return d;
-}
 async function completeTask(id){
   const t=state.tasks.find(x=>x.id===id); if(!t)return;
   let code=null;
@@ -481,34 +366,22 @@ async function completeTask(id){
     code=prompt('Nhập mã hoàn thành nhiệm vụ:');
     if(!code)return;
   }
-  try{
-    const data=await secureReward({kind:'task',task_id:id,completion_code:code});
-    alert('Đã nhận '+money(data.reward_amount));
-    await Promise.all([loadAuth(),loadNotifications()]);
-    renderRewards();
-  }catch(e){
-    alert(e.message||String(e));
-    await loadAuth();
-    renderRewards();
-  }
+  const {data,error}=await sb.rpc('complete_reward_task',{p_task_id:id,p_completion_code:code});
+  if(error)alert(error.message);
+  else{alert('Đã nhận '+money(data.reward_amount));await Promise.all([loadAuth(),loadNotifications()]);renderRewards()}
 }
 
 async function claimCheckin(){
-  try{
-    const data=await secureReward({kind:'checkin'});
-    if(Number(data.reward_amount||0)>0) alert('🔥 Đủ 7 ngày! Bạn nhận '+money(data.reward_amount));
-    else alert('Check-in thành công · Ngày '+data.cycle_day+'/7');
-    await Promise.all([loadAuth(),loadNotifications()]);
-    renderRewards();
-  }catch(e){
-    alert(e.message||String(e));
-    await loadAuth();
-    renderRewards();
+  const {data,error}=await sb.rpc('claim_daily_checkin');
+  if(error){alert(error.message);return}
+  if(Number(data.reward_amount||0)>0){
+    alert('🔥 Đủ 7 ngày! Bạn nhận '+money(data.reward_amount));
+  }else{
+    alert('Check-in thành công · Ngày '+data.cycle_day+'/7');
   }
+  await Promise.all([loadAuth(),loadNotifications()]);
+  renderRewards();
 }
-
-
-
 
 function watchRewardedAd(taskId){
   if(window.AndroidRewardAds&&typeof window.AndroidRewardAds.showRewardedAd==='function'){
@@ -549,8 +422,7 @@ async function renderAccount(){
     <div class="toolbar">
       <button class="btn" onclick="M4X.topup()">+ Nạp tiền</button>
       <button class="btn ghost" onclick="M4X.redeemCode()">Nhập code</button>
-      <button class="btn ghost" onclick="M4X.orderHistory()">Đơn hàng</button>
-      <button class="btn ghost" onclick="M4X.supportCenter()">Hỗ trợ</button>
+      <button class="btn ghost" onclick="M4X.redeemCode()">Nhập code</button>
       ${state.profile?.role==='admin'?'<button class="btn ghost" onclick="location.href=\'./admin.html\'">Quản trị</button>':''}
       <button class="btn ghost" onclick="M4X.editProfile()">Sửa tài khoản</button>
       <button class="btn ghost" onclick="M4X.checkUpdate(true)">Kiểm tra cập nhật</button>
@@ -580,154 +452,6 @@ async function changePass(){
   const v=$('newPass').value;if(v.length<6){$('profileMsg').textContent='Mật khẩu tối thiểu 6 ký tự';return}
   const {error}=await sb.auth.updateUser({password:v});$('profileMsg').textContent=error?error.message:'Đã đổi mật khẩu.';
 }
-
-const orderStatusText=s=>({
-  pending:'Chờ thanh toán',paid:'Đã thanh toán',expired:'Hết hạn',cancelled:'Đã hủy',
-  review:'Đang kiểm tra',refunded:'Đã hoàn tiền'
-}[s]||s||'—');
-const paymentText=s=>({wallet:'Số dư M4X',gift_code:'Gift code',bank:'Chuyển khoản',sepay:'SePay'}[s]||s||'—');
-
-async function loadMyOrders(){
-  if(!state.me)return [];
-  const {data,error}=await sb.from('orders')
-    .select('id,order_code,product_id,quantity,amount,status,payment_method,created_at,paid_at,refunded_at,refund_reason,access_token,purchased_version,products(name,delivery_type,version_name,cover_url),order_invoices(invoice_no,issued_at,status)')
-    .eq('user_id',state.me.id)
-    .order('created_at',{ascending:false})
-    .limit(200);
-  if(error)throw error;
-  return data||[];
-}
-
-async function orderHistory(){
-  if(!state.me)return auth('login');
-  openModal('<h2>Đơn hàng của tôi</h2><div class="muted">Đang tải...</div>');
-  try{
-    const orders=await loadMyOrders();
-    $('modalContent').innerHTML=`<h2>Đơn hàng của tôi</h2>
-      <p class="muted">Trạng thái, số tiền, hóa đơn, tải lại file và hỗ trợ.</p>
-      ${orders.map(o=>{
-        const p=o.products||{};
-        const inv=Array.isArray(o.order_invoices)?o.order_invoices[0]:o.order_invoices;
-        return `<div class="item orderCard">
-          <div class="row"><div><b>${esc(p.name||'Sản phẩm')}</b><div class="muted">${esc(o.order_code)}</div></div><span class="statusTag ${esc(o.status)}">${esc(orderStatusText(o.status))}</span></div>
-          <div class="meta">
-            <div><span class="muted">Ngày mua</span><br>${dt(o.paid_at||o.created_at)}</div>
-            <div><span class="muted">Số tiền</span><br><b>${money(o.amount)}</b></div>
-            <div><span class="muted">Thanh toán</span><br>${esc(paymentText(o.payment_method))}</div>
-            <div><span class="muted">Hóa đơn</span><br>${esc(inv?.invoice_no||'Đang tạo')}</div>
-          </div>
-          ${o.status==='refunded'?`<div class="notice">Đã hoàn tiền${o.refund_reason?' · '+esc(o.refund_reason):''}</div>`:''}
-          <div class="toolbar">
-            ${o.status==='paid'&&p.delivery_type==='download'?`<button class="btn" onclick="M4X.download('${esc(o.order_code)}','${esc(o.access_token)}')">Tải lại</button>`:''}
-            ${inv?`<button class="btn ghost" onclick="M4X.showInvoice('${o.id}')">Hóa đơn</button>`:''}
-            <button class="btn ghost" onclick="M4X.newTicket('${o.id}')">Yêu cầu hỗ trợ</button>
-          </div>
-        </div>`;
-      }).join('')||'<div class="muted">Bạn chưa có đơn hàng.</div>'}`;
-  }catch(e){
-    $('modalContent').innerHTML=`<h2>Đơn hàng</h2><p class="badtxt">${esc(e.message)}</p>`;
-  }
-}
-
-async function showInvoice(orderId){
-  const {data,error}=await sb.from('order_invoices').select('*').eq('order_id',orderId).maybeSingle();
-  if(error||!data){alert(error?.message||'Chưa có hóa đơn cho đơn này');return;}
-  openModal(`<div class="invoice">
-    <div class="invoiceBrand">M4X STORE</div><h2>HÓA ĐƠN ĐIỆN TỬ</h2><div class="muted">${esc(data.invoice_no)}</div><hr>
-    <div class="invoiceRow"><span>Mã đơn</span><b>${esc(data.order_code)}</b></div>
-    <div class="invoiceRow"><span>Sản phẩm</span><b>${esc(data.product_name)}</b></div>
-    <div class="invoiceRow"><span>Số lượng</span><b>${Number(data.quantity||1)}</b></div>
-    <div class="invoiceRow"><span>Thanh toán</span><b>${esc(paymentText(data.payment_method))}</b></div>
-    <div class="invoiceRow"><span>Ngày phát hành</span><b>${dt(data.issued_at)}</b></div>
-    <div class="invoiceRow"><span>Trạng thái</span><b>${esc(orderStatusText(data.status))}</b></div><hr>
-    <div class="invoiceTotal"><span>Tổng thanh toán</span><b>${money(data.amount)}</b></div>
-    <p class="muted">Hóa đơn được lưu trong tài khoản M4X STORE.</p>
-  </div>`);
-}
-
-async function supportCenter(){
-  if(!state.me)return auth('login');
-  openModal('<h2>Hỗ trợ khách hàng</h2><div class="muted">Đang tải...</div>');
-  const {data,error}=await sb.from('support_tickets').select('*,orders(order_code,products(name))').eq('user_id',state.me.id).order('updated_at',{ascending:false});
-  if(error){$('modalContent').innerHTML=`<h2>Hỗ trợ</h2><p class="badtxt">${esc(error.message)}</p>`;return;}
-  $('modalContent').innerHTML=`<h2>Hỗ trợ khách hàng</h2>
-    <button class="btn" onclick="M4X.newTicket()">+ Tạo yêu cầu</button>
-    ${(data||[]).map(t=>`<div class="item" onclick="M4X.openTicket('${t.id}')">
-      <div class="row"><div><b>${esc(t.subject)}</b><div class="muted">${esc(t.ticket_code)}${t.orders?.order_code?' · '+esc(t.orders.order_code):''}</div></div><span class="statusTag ${esc(t.status)}">${esc(t.status)}</span></div>
-      <div class="muted">${dt(t.updated_at)}</div>
-    </div>`).join('')||'<div class="muted">Bạn chưa gửi yêu cầu hỗ trợ.</div>'}`;
-}
-
-async function newTicket(orderId=''){
-  if(!state.me)return auth('login');
-  const orders=await loadMyOrders();
-  openModal(`<h2>Tạo yêu cầu hỗ trợ</h2>
-    <label>Đơn hàng</label><select id="supportOrder" class="select"><option value="">Không gắn đơn hàng</option>${orders.map(o=>`<option value="${o.id}" ${o.id===orderId?'selected':''}>${esc(o.order_code)} · ${esc(o.products?.name||'Sản phẩm')}</option>`).join('')}</select>
-    <label>Tiêu đề</label><input id="supportSubject" class="input" placeholder="Ví dụ: Không tải được file">
-    <label>Nội dung</label><textarea id="supportMessage" class="textarea" placeholder="Mô tả lỗi bạn gặp..."></textarea>
-    <label>Ảnh lỗi (không bắt buộc, tối đa 5 MB)</label><input id="supportImage" class="input" type="file" accept="image/*">
-    <button class="btn" onclick="M4X.submitTicket()">Gửi yêu cầu</button><div id="supportMsg" class="muted"></div>`);
-}
-
-async function uploadSupportImage(ticketId,file){
-  if(!file)return null;
-  if(file.size>5*1024*1024)throw new Error('Ảnh hỗ trợ tối đa 5 MB');
-  if(!String(file.type||'').startsWith('image/'))throw new Error('Chỉ được gửi file ảnh');
-  const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  const path=`${state.me.id}/${ticketId}/${Date.now()}-${safe}`;
-  const {error}=await sb.storage.from('support-images').upload(path,file,{upsert:false});
-  if(error)throw error;
-  return path;
-}
-
-async function submitTicket(){
-  const box=$('supportMsg');
-  try{
-    box.textContent='Đang gửi...';
-    const {data,error}=await sb.rpc('create_support_ticket',{p_subject:$('supportSubject').value.trim(),p_message:$('supportMessage').value.trim(),p_order_id:$('supportOrder').value||null});
-    if(error)throw error;
-    const file=$('supportImage').files[0];
-    if(file){
-      const path=await uploadSupportImage(data.ticket_id,file);
-      const {error:me}=await sb.rpc('send_support_message',{p_ticket_id:data.ticket_id,p_message:'Ảnh lỗi đính kèm',p_attachment_path:path});
-      if(me)throw me;
-    }
-    alert('Đã tạo ticket '+data.ticket_code);
-    await supportCenter();
-  }catch(e){box.textContent=e.message||String(e);}
-}
-
-async function signedSupportImage(path){
-  if(!path)return null;
-  const {data,error}=await sb.storage.from('support-images').createSignedUrl(path,300);
-  return error?null:data?.signedUrl;
-}
-
-async function openTicket(id){
-  const [{data:t,error:te},{data:m,error:me}]=await Promise.all([
-    sb.from('support_tickets').select('*,orders(order_code,products(name))').eq('id',id).single(),
-    sb.from('support_messages').select('*').eq('ticket_id',id).order('created_at')
-  ]);
-  if(te||me){alert(te?.message||me?.message);return;}
-  const messages=await Promise.all((m||[]).map(async x=>({...x,image:x.attachment_path?await signedSupportImage(x.attachment_path):null})));
-  openModal(`<h2>${esc(t.subject)}</h2><div class="muted">${esc(t.ticket_code)} · ${t.orders?.order_code?esc(t.orders.order_code)+' · ':''}${esc(t.status)}</div>
-    <div class="ticketChat">${messages.map(x=>`<div class="ticketMsg ${x.sender_role==='admin'?'admin':'user'}"><b>${x.sender_role==='admin'?'M4X Admin':'Bạn'}</b>${x.message?`<div>${esc(x.message)}</div>`:''}${x.image?`<img src="${esc(x.image)}" class="ticketImage">`:''}<div class="muted">${dt(x.created_at)}</div></div>`).join('')}</div>
-    ${t.status==='closed'?'<div class="notice">Ticket đã đóng.</div>':`<textarea id="ticketReply" class="textarea" placeholder="Nhập phản hồi..."></textarea><input id="ticketReplyImage" class="input" type="file" accept="image/*"><button class="btn" onclick="M4X.replyTicket('${t.id}')">Gửi phản hồi</button>`}
-    <button class="btn ghost" onclick="M4X.supportCenter()">← Danh sách hỗ trợ</button>`);
-}
-
-async function replyTicket(id){
-  try{
-    let msg=$('ticketReply').value.trim();
-    const file=$('ticketReplyImage').files[0];
-    let path=null;
-    if(file){path=await uploadSupportImage(id,file);if(!msg)msg='Ảnh đính kèm';}
-    const {error}=await sb.rpc('send_support_message',{p_ticket_id:id,p_message:msg,p_attachment_path:path});
-    if(error)throw error;
-    await openTicket(id);
-  }catch(e){alert(e.message||String(e));}
-}
-
 function versionParts(v){return String(v||'0').replace(/^v/i,'').split('.').map(x=>Number(x.replace(/\D.*$/,''))||0)}
 function newer(a,b){
   const A=versionParts(a),B=versionParts(b),n=Math.max(A.length,B.length);
@@ -762,9 +486,7 @@ function policy(type){
 }
 Object.assign(window.M4X,{
   product,action,auth,login,register,forgot,logout,buy,topup,makeTopup,download,
-  readNotif,readAll,editProfile,saveName,changePass,checkUpdate,policy,
-  redeemCode,submitGiftCode,completeTask,claimCheckin,watchRewardedAd,
-  orderHistory,showInvoice,supportCenter,newTicket,submitTicket,openTicket,replyTicket
+  readNotif,readAll,editProfile,saveName,changePass,checkUpdate,policy,redeemCode,submitGiftCode,completeTask,claimCheckin,watchRewardedAd,redeemCode,submitGiftCode,completeTask,claimCheckin,watchRewardedAd
 });
 document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 $('accountQuick').onclick=()=>setView('account');

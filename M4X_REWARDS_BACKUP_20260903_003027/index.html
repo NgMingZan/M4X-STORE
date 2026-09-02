@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>M4X STORE</title>
+<link rel="stylesheet" href="./assets/app.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">M4X <span>STORE</span></div>
+    <button id="accountQuick" class="btn ghost">Tài khoản</button>
+  </header>
+
+  <div id="updateBar" class="updatebar">
+    <div><b>Có bản M4X STORE mới</b><div id="updateText" class="muted"></div></div>
+    <button id="updateBtn" class="btn">Cập nhật</button>
+  </div>
+
+  <main id="view"></main>
+</div>
+
+<nav class="bottomnav">
+  <button class="navbtn active" data-view="store">Cửa hàng</button>
+  <button class="navbtn" data-view="library">Thư viện</button>
+  <button class="navbtn" data-view="notifications">Thông báo <span id="notifBadge"></span></button>
+  <button class="navbtn" data-view="account">Tài khoản</button>
+</nav>
+
+<div id="modal" class="modal">
+  <div class="sheet">
+    <button class="btn ghost close" onclick="M4X.closeModal()">Đóng</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script src="./assets/store.js"></script>
+</body>
+</html>
