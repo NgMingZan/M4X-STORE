@@ -1,0 +1,42 @@
+/* M4X STORE V11.3 — Maintenance Guard */
+#m4xMaintenanceBar{
+  position:sticky;
+  top:58px;
+  z-index:29;
+  margin:6px 0 10px;
+  border:1px solid #efdca8;
+  background:#fff8e8;
+  color:#6c4b0c;
+  border-radius:13px;
+  padding:10px 12px;
+  font-size:11px;
+  line-height:1.45;
+  display:none;
+}
+#m4xMaintenanceBar.show{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#m4xMaintenanceBar.admin{
+  border-color:#d9e2ff;
+  background:#f3f6ff;
+  color:#2d427a;
+}
+#m4xMaintenanceBar b{font-size:12px}
+#m4xMaintenanceBar button{
+  flex:0 0 auto;
+  border:1px solid currentColor;
+  background:transparent;
+  color:inherit;
+  border-radius:9px;
+  padding:6px 8px;
+  font-size:10px;
+  font-weight:850;
+}
+.m4x-maint-lock{
+  text-align:center;
+  padding:6px 0 2px;
+  color:#a26708;
+  font-size:10px;
+  font-weight:800;
+}
+@media(max-width:700px){
+  #m4xMaintenanceBar{top:54px;margin:4px 0 8px;padding:9px 10px}
+}
