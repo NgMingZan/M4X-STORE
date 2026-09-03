@@ -1,0 +1,44 @@
+
+/* M4X Referral V17 — Luxury card */
+.m4x-referral-card{
+  position:relative;overflow:hidden;margin:12px 0 16px;padding:16px;
+  border:1px solid #3b3425;border-radius:18px;
+  background:
+    radial-gradient(circle at 100% 0,rgba(217,182,111,.13),transparent 33%),
+    linear-gradient(145deg,#12130f,#0b1119 58%,#0b1119);
+}
+.m4x-referral-card:after{
+  content:"";position:absolute;right:-38px;bottom:-55px;width:150px;height:150px;border-radius:50%;
+  border:1px solid rgba(217,182,111,.10)
+}
+.m4x-referral-head{position:relative;z-index:2;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.m4x-referral-head h3{margin:0;font-size:15px;color:#f3e1b7}
+.m4x-referral-head p{margin:5px 0 0;color:#8593a6;font-size:9px;line-height:1.5}
+.m4x-referral-reward{
+  white-space:nowrap;padding:6px 8px;border-radius:9px;
+  background:#241e11;border:1px solid #554728;color:#e8cb88;font-size:9px;font-weight:900
+}
+.m4x-ref-code{
+  position:relative;z-index:2;margin-top:13px;padding:11px 12px;border-radius:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  background:#0a1119;border:1px solid #283748
+}
+.m4x-ref-code small{display:block;color:#75849a;font-size:8px;margin-bottom:3px}
+.m4x-ref-code b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#f0daa6;font-size:13px;letter-spacing:.7px}
+.m4x-ref-stats{
+  position:relative;z-index:2;display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px
+}
+.m4x-ref-stat{padding:9px;border:1px solid #202e3e;border-radius:11px;background:#0a1119}
+.m4x-ref-stat small{display:block;color:#728198;font-size:8px}
+.m4x-ref-stat b{display:block;margin-top:3px;font-size:12px;color:#eef2f7}
+.m4x-ref-actions{position:relative;z-index:2;display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.m4x-ref-actions .btn{font-size:9px}
+.m4x-ref-apply{margin-top:11px;padding-top:11px;border-top:1px solid #242b2e}
+.m4x-ref-apply-row{display:grid;grid-template-columns:1fr auto;gap:7px}
+.m4x-ref-apply .input{text-transform:uppercase}
+.m4x-ref-note{font-size:8px;color:#748299;margin-top:7px;line-height:1.5}
+.m4x-ref-status{display:inline-flex;margin-top:9px;padding:6px 8px;border-radius:9px;background:#0a261a;color:#4ce09c;font-size:8px;font-weight:850}
+@media(max-width:520px){
+  .m4x-ref-stats{grid-template-columns:repeat(3,1fr)}
+  .m4x-ref-stat{padding:8px}.m4x-ref-stat b{font-size:11px}
+}
