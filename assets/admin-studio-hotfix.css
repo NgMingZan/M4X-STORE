@@ -1,0 +1,47 @@
+/* M4X ADMIN V14.1 HOTFIX */
+#products .grid2{grid-template-columns:1fr!important}
+#products .grid2 > .item:first-child{display:none}
+
+.adm-product-form-modal .adm-form-slot > .item{
+  display:block!important;
+  background:#06111f!important;
+  border:0!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+#products .grid2 > div:not(.item){
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+}
+
+.adm-product-form-modal{
+  position:fixed!important;
+  inset:0!important;
+  z-index:120!important;
+  background:rgba(0,2,7,.78)!important;
+  backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
+  display:grid!important;
+  place-items:center!important;
+  padding:14px!important;
+}
+.adm-product-form-modal.hidden{display:none!important}
+.adm-product-form-modal .adm-form-shell{
+  width:min(620px,100%)!important;
+  max-height:92vh!important;
+  overflow:auto!important;
+  background:#061425!important;
+  border:1px solid #17476f!important;
+  border-radius:18px!important;
+  padding:15px!important;
+}
+
+.adminTop,.tabs{contain:paint}
+.adm-products-head{position:relative;z-index:1}
+.adm-icon-btn{
+  font-family:Arial,sans-serif!important;
+  font-weight:900!important;
+  line-height:1!important;
+}

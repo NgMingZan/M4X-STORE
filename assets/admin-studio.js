@@ -184,8 +184,7 @@
 
   window.ADMStudio={go:switchTab,openProductForm,closeProductForm,editProduct:editProductStudio,orderAction};
 
-  const obs=new MutationObserver(()=>{topChrome();relabelTabs();decorateNotices()});
-  obs.observe(document.body,{childList:true,subtree:true});
+  
   setTimeout(hook,250);
   setTimeout(hook,1200);
 })();
