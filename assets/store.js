@@ -52,7 +52,15 @@ async function loadProducts(){
     sb.from('categories').select('*').eq('active',true).order('sort_order'),
     sb.from('products').select('*,categories(name)').eq('active',true).order('created_at',{ascending:false})
   ]);
-  state.categories=c||[]; state.products=p||[];
+  state.categories=(c||[]).sort((a,b)=>{
+    const an=String(a?.name||'').trim().toLowerCase();
+    const bn=String(b?.name||'').trim().toLowerCase();
+    const aTheme=an==='theme'||an.includes('theme');
+    const bTheme=bn==='theme'||bn.includes('theme');
+    if(aTheme!==bTheme)return aTheme?-1:1;
+    return 0;
+  });
+  state.products=p||[];
 }
 async function loadNotifications(){
   state.notifications=[];
