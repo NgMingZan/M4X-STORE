@@ -28,7 +28,7 @@ import android.widget.Toast;
 import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
-    private static final String REMOTE_STORE_URL = "https://ngmingzan.github.io/M4X-STORE/";
+    private static final String REMOTE_STORE_URL = "https://m4x-store.pages.dev/";
     private static final String LOCAL_STORE_URL = "https://appassets.androidplatform.net/assets/index.html";
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private WebView webView;
