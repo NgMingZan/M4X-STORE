@@ -1,18 +1,18 @@
 {
-  "updated_at": "2026-09-03T11:42:35.939117+07:00",
-  "message": "M4X STORE đang bảo trì thử nghiệm. Một số dịch vụ có thể tạm thời không khả dụng.",
+  "updated_at": "2026-09-03T11:47:40.375737+07:00",
+  "message": "M4X STORE đang bảo trì. Mua hàng, nạp tiền và tải file tạm thời bị khóa.",
   "services": {
     "store": {
       "status": "maintenance",
-      "note": "M4X STORE đang bảo trì thử nghiệm."
+      "note": "M4X STORE đang bảo trì."
     },
     "downloads": {
       "status": "maintenance",
-      "note": "Hệ thống tải file đang bảo trì."
+      "note": "Hệ thống tải file đang tạm bảo trì."
     },
     "payments": {
       "status": "maintenance",
-      "note": "Thanh toán đang tạm bảo trì."
+      "note": "Mua hàng và nạp tiền đang tạm bảo trì."
     },
     "telegram": {
       "status": "maintenance",
