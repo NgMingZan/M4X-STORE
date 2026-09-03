@@ -1,0 +1,22 @@
+{
+  "updated_at": "2026-09-03T10:50:00+07:00",
+  "message": "Hệ thống M4X STORE đang hoạt động bình thường.",
+  "services": {
+    "store": {
+      "status": "operational",
+      "note": "Website và ứng dụng hoạt động bình thường."
+    },
+    "downloads": {
+      "status": "operational",
+      "note": "Hệ thống tải sản phẩm hoạt động bình thường."
+    },
+    "payments": {
+      "status": "operational",
+      "note": "Nạp tiền và thanh toán ví M4X hoạt động bình thường."
+    },
+    "telegram": {
+      "status": "operational",
+      "note": "CSKH Telegram @bengtayy đang tiếp nhận hỗ trợ."
+    }
+  }
+}
