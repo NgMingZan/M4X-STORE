@@ -1,0 +1,203 @@
+
+/* =========================================================
+   M4X STORE V16.1 — Product Detail Contrast Fix
+   Fix white cards + white text inherited from V11.2
+   ========================================================= */
+
+/* Modal shell */
+.sheet:has(.m4x-product-detail){
+  background:linear-gradient(180deg,#101722,#090f17)!important;
+  border:1px solid #28384c!important;
+  color:#f5f7fb!important;
+}
+
+/* Preview */
+.m4x-preview-main,
+.m4x-preview-empty{
+  background:#0d151f!important;
+  border-color:#26364a!important;
+  color:#8d9bae!important;
+}
+.m4x-thumb{
+  background:#0d151f!important;
+  border-color:#1c2939!important;
+}
+.m4x-thumb.active{
+  border-color:#d7b76f!important;
+}
+
+/* Main purchase card */
+.m4x-product-buybox{
+  background:linear-gradient(180deg,#0d151f,#0a1119)!important;
+  border-color:#26364a!important;
+  color:#f6f8fb!important;
+  box-shadow:0 14px 44px rgba(0,0,0,.22)!important;
+}
+.m4x-product-cat{
+  color:#bba66f!important;
+}
+.m4x-product-title{
+  color:#f6f7fa!important;
+}
+.m4x-product-price{
+  color:#efd9a5!important;
+  text-shadow:none!important;
+}
+.m4x-product-stock{
+  color:#8795a8!important;
+}
+
+/* Buttons stay readable */
+.m4x-buy-actions .btn{
+  color:#f2f5f9!important;
+  background:#111b27!important;
+  border-color:#2a3a4e!important;
+}
+.m4x-buy-actions .btn:not(.ghost):not(:disabled){
+  background:linear-gradient(135deg,#dec27d,#c9a45d)!important;
+  color:#17120b!important;
+  border-color:transparent!important;
+}
+.m4x-buy-actions .btn.ghost{
+  background:#0d151f!important;
+  color:#d9e1ea!important;
+}
+
+/* Trust cards */
+.m4x-product-trust div{
+  background:#101823!important;
+  border-color:#26364a!important;
+  color:#bdc7d3!important;
+}
+
+/* Description */
+.m4x-product-body{
+  color:#eef2f7!important;
+}
+.m4x-product-summary{
+  color:#c3ccd7!important;
+  font-size:13px!important;
+  line-height:1.72!important;
+}
+.m4x-detail-section{
+  border-color:#1f2d3d!important;
+}
+.m4x-detail-section h3{
+  color:#f3f5f8!important;
+}
+
+/* Specs */
+.m4x-spec{
+  background:#0f1721!important;
+  border-color:#26364a!important;
+  color:#eef2f6!important;
+}
+.m4x-spec small{
+  color:#8190a4!important;
+}
+.m4x-spec b{
+  color:#e8edf3!important;
+}
+
+/* Changelog */
+.m4x-changelog{
+  background:#0f1721!important;
+  border-color:#26364a!important;
+  color:#c7d0dc!important;
+  line-height:1.68!important;
+}
+
+/* Detail tools */
+.m4x-detail-tools .btn{
+  background:#101823!important;
+  color:#e6ecf3!important;
+  border-color:#29394c!important;
+}
+
+/* Product modal close button */
+.sheet:has(.m4x-product-detail) > .close{
+  background:#101823!important;
+  color:#e7edf4!important;
+  border-color:#29394c!important;
+}
+
+/* System Status page was also white in V11.2 */
+.m4x-overall,
+.m4x-status-card,
+.m4x-status-note{
+  background:#0d151f!important;
+  border-color:#253549!important;
+  color:#edf2f7!important;
+}
+.m4x-overall.good{
+  background:#0a2118!important;
+  border-color:#1c543d!important;
+}
+.m4x-overall.warn{
+  background:#20190b!important;
+  border-color:#564221!important;
+}
+.m4x-overall.bad{
+  background:#241117!important;
+  border-color:#5b2334!important;
+}
+.m4x-status-icon{
+  background:#111b27!important;
+  color:#d8e3ef!important;
+}
+.m4x-status-card b{
+  color:#f1f4f8!important;
+}
+.m4x-status-card small,
+.m4x-status-note{
+  color:#8998ac!important;
+}
+.m4x-status-label{
+  background:#141d29!important;
+  color:#9cabbc!important;
+}
+.m4x-status-label.operational{
+  background:#0b2a1d!important;
+  color:#4fe09c!important;
+}
+.m4x-status-label.maintenance,
+.m4x-status-label.degraded{
+  background:#261d0b!important;
+  color:#e3bd67!important;
+}
+.m4x-status-label.outage{
+  background:#291118!important;
+  color:#ff7690!important;
+}
+
+/* Risk / notice areas */
+.m4x-product-detail .notice{
+  background:#17130b!important;
+  color:#dcc58d!important;
+  border-color:#4b3c20!important;
+}
+
+/* More comfortable mobile spacing */
+@media(max-width:700px){
+  .sheet:has(.m4x-product-detail){
+    padding:11px!important;
+  }
+  .m4x-product-buybox{
+    padding:14px!important;
+    border-radius:16px!important;
+  }
+  .m4x-product-title{
+    font-size:21px!important;
+    line-height:1.18!important;
+  }
+  .m4x-product-price{
+    font-size:25px!important;
+  }
+  .m4x-product-summary,
+  .m4x-changelog{
+    font-size:12px!important;
+  }
+  .m4x-spec{
+    min-height:78px!important;
+  }
+}
