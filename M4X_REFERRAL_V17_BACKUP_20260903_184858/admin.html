@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>M4X STORE Admin</title>
+<link rel="stylesheet" href="./assets/app.css">
+<link rel="stylesheet" href="./assets/v8.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js?v=m4x-sync-v2"></script>
+<link rel="stylesheet" href="./assets/admin-premium-v15.css?v=m4x-admin-premium-v15">
+</head>
+<body>
+
+<div id="adminLogin" class="sheet" style="margin:10vh auto;max-width:440px">
+  <h2>M4X STORE Admin</h2>
+  <p class="muted">Tài khoản Admin trong Store sẽ được nhận tự động. Chỉ đăng nhập lại khi phiên đã hết.</p>
+  <input id="adminEmail" class="input" type="email" autocomplete="username" placeholder="Email Admin">
+  <input id="adminPassword" class="input" type="password" autocomplete="current-password" placeholder="Mật khẩu">
+  <button id="adminLoginBtn" type="button" class="btn" style="width:100%;margin-top:4px" onclick="ADM.login()">Đăng nhập</button>
+  <button type="button" class="btn ghost" style="width:100%;margin-top:10px" onclick="location.href='./index.html'">Về Store</button>
+  <div id="adminLoginMsg" class="muted" style="margin-top:10px"></div>
+</div>
+
+<div id="adminApp" class="adminApp hidden">
+  <header class="top adminTop">
+    <div class="brand">M4X STORE <span>Admin</span></div>
+    <div class="toolbar">
+      <button type="button" class="btn ghost" onclick="location.href='./index.html'">Xem Store</button>
+      <button type="button" class="btn ghost" onclick="ADM.refresh()">Làm mới</button>
+      <button type="button" class="btn bad" onclick="ADM.logout()">Đăng xuất</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button type="button" class="tab active" data-tab="dashboard">Tổng quan</button>
+    <button type="button" class="tab" data-tab="products">Sản phẩm</button>
+    <button type="button" class="tab" data-tab="categories">Danh mục</button>
+    <button type="button" class="tab" data-tab="orders">Đơn hàng</button>
+    <button type="button" class="tab" data-tab="users">Người dùng</button>
+    <button type="button" class="tab" data-tab="topups">Nạp tiền</button>
+    <button type="button" class="tab" data-tab="notices">Thông báo</button>
+    <button type="button" class="tab" data-tab="codes">Gift code</button>
+    <button type="button" class="tab" data-tab="tasks">Nhiệm vụ</button>
+    <button type="button" class="tab" data-tab="support">Hỗ trợ</button>
+    <button type="button" class="tab" data-tab="security">Bảo mật</button>
+    <button type="button" class="tab" data-tab="appinfo">Ứng dụng</button>
+  </nav>
+
+  <section id="dashboard" class="panel active">
+    <div id="stats" class="statgrid"></div>
+    <div class="sectionTitle">Sản phẩm bán chạy</div>
+    <div id="bestSeller" class="item"></div>
+  </section>
+
+  <section id="products" class="panel">
+    <div class="grid2">
+      <div class="item">
+        <h2 id="productFormTitle">Thêm sản phẩm</h2>
+        <input id="pId" type="hidden">
+
+        <label>Tên sản phẩm</label>
+        <input id="pName" class="input">
+
+        <label>Danh mục</label>
+        <select id="pCategory" class="select"></select>
+
+        <label>Giá</label>
+        <input id="pPrice" class="input" type="number" min="0">
+
+        <label>Trạng thái</label>
+        <select id="pStatus" class="select">
+          <option value="active">Đang bán</option>
+          <option value="new">Mới</option>
+          <option value="coming_soon">Sắp ra mắt</option>
+          <option value="out_of_stock">Hết hàng</option>
+          <option value="discontinued">Ngừng bán</option>
+        </select>
+
+        <label>Loại giao</label>
+        <select id="pDelivery" class="select">
+          <option value="download">File tải xuống · mua 1 lần</option>
+          <option value="content">Nội dung premium · mua nhiều lần</option>
+          <option value="license">License / key · mua nhiều lần</option>
+          <option value="service">Dịch vụ · mua nhiều lần</option>
+          <option value="subscription">VIP / subscription · mua nhiều lần</option>
+          <option value="external">Link ngoài · mua nhiều lần</option>
+        </select>
+
+        <label>Kho</label>
+        <select id="pStockMode" class="select" onchange="ADM.toggleStock()">
+          <option value="unlimited">Không giới hạn</option>
+          <option value="limited">Giới hạn số lượng</option>
+        </select>
+        <input id="pStock" class="input hidden" type="number" min="0" placeholder="Số lượng">
+
+        <label>Phiên bản</label>
+        <input id="pVersion" class="input" value="1.0">
+
+        <label>Tương thích</label>
+        <input id="pCompatibility" class="input" placeholder="Ví dụ: HyperOS 1/2/3">
+
+        <label>Dung lượng</label>
+        <input id="pSize" class="input" placeholder="Ví dụ: 28 MB">
+
+        <label>Video demo</label>
+        <input id="pVideo" class="input" type="url" placeholder="https://...">
+
+        <label>Mô tả</label>
+        <textarea id="pDesc" class="textarea"></textarea>
+
+        <label>Ghi chú cập nhật</label>
+        <textarea id="pChangelog" class="textarea"></textarea>
+
+        <label>Cảnh báo tool/trick</label>
+        <textarea id="pRisk" class="textarea" placeholder="Để trống nếu không cần"></textarea>
+
+        <label>Ảnh bìa</label>
+        <input id="pCover" class="input" type="file" accept="image/*">
+
+        <label>Ảnh preview</label>
+        <input id="pGallery" class="input" type="file" accept="image/*" multiple>
+
+        <label>File giao khách</label>
+        <input id="pFile" class="input" type="file">
+
+        <div class="toolbar">
+          <button type="button" class="btn" onclick="ADM.saveProduct()">Lưu sản phẩm</button>
+          <button type="button" class="btn ghost" onclick="ADM.resetProductForm()">Hủy sửa</button>
+        </div>
+        <div id="pMsg" class="muted"></div>
+      </div>
+
+      <div>
+        <input id="productSearch" class="search" placeholder="Tìm sản phẩm...">
+        <div id="productList"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="categories" class="panel">
+    <div class="grid2">
+      <div class="item">
+        <h2>Thêm danh mục</h2>
+        <input id="catName" class="input" placeholder="Tên">
+        <input id="catIcon" class="input" placeholder="Icon">
+        <input id="catSlug" class="input" placeholder="Slug">
+        <textarea id="catDesc" class="textarea" placeholder="Mô tả"></textarea>
+        <button type="button" class="btn" onclick="ADM.addCategory()">Thêm</button>
+        <div id="catMsg" class="muted"></div>
+      </div>
+      <div id="catList"></div>
+    </div>
+  </section>
+
+  <section id="orders" class="panel">
+    <input id="orderSearch" class="search" placeholder="Tìm mã đơn / sản phẩm / user...">
+    <div id="orderList"></div>
+  </section>
+
+  <section id="users" class="panel">
+    <input id="userSearch" class="search" placeholder="Tìm tên / user ID...">
+    <div id="userList"></div>
+  </section>
+
+  <section id="topups" class="panel">
+    <input id="topupSearch" class="search" placeholder="Tìm mã nạp / user...">
+    <div id="topupList"></div>
+  </section>
+
+  <section id="notices" class="panel">
+    <div class="grid2">
+      <div class="item">
+        <h2>Gửi thông báo</h2>
+        <input id="nTitle" class="input" placeholder="Tiêu đề">
+        <textarea id="nBody" class="textarea" placeholder="Nội dung"></textarea>
+        <select id="nType" class="select">
+          <option value="system">Hệ thống</option>
+          <option value="info">Thông tin</option>
+          <option value="update">Cập nhật</option>
+        </select>
+        <button type="button" class="btn" onclick="ADM.broadcast()">Gửi cho tất cả</button>
+        <div id="nMsg" class="muted"></div>
+      </div>
+      <div id="noticeList"></div>
+    </div>
+  </section>
+
+  
+  <section id="codes" class="panel">
+    <div class="grid2">
+      <div class="item">
+        <h2>Tạo gift code</h2>
+        <input id="gcCode" class="input" placeholder="M4X-NEWUSER">
+        <input id="gcTitle" class="input" placeholder="Tên chương trình">
+        <select id="gcType" class="select"><option value="balance">Tặng số dư</option><option value="product">Tặng sản phẩm</option></select>
+        <input id="gcAmount" class="input" type="number" min="0" placeholder="Số dư tặng">
+        <select id="gcProduct" class="select"><option value="">Chọn sản phẩm</option></select>
+        <input id="gcMaxUses" class="input" type="number" min="1" value="1" placeholder="Tổng lượt dùng">
+        <input id="gcExpiry" class="input" type="datetime-local">
+        <button type="button" class="btn" onclick="ADM.createGiftCode()">Tạo code</button>
+        <div id="gcMsg" class="muted"></div>
+      </div>
+      <div id="giftCodeList"></div>
+    </div>
+  </section>
+
+  <section id="tasks" class="panel">
+    <div class="grid2">
+      <div class="item">
+        <h2>Tạo nhiệm vụ</h2>
+        <input id="taskTitle" class="input" placeholder="Tên nhiệm vụ">
+        <textarea id="taskDesc" class="textarea" placeholder="Mô tả"></textarea>
+        <select id="taskType" class="select" onchange="ADM.taskTypeChanged()"><option value="link">Vượt link / mở link</option><option value="rewarded_ad">Xem quảng cáo</option><option value="manual">Nhập mã</option></select>
+        <input id="taskReward" class="input" type="number" min="0" value="2000" placeholder="Thưởng">
+        <input id="taskUrl" class="input" type="url" placeholder="Link nhiệm vụ">
+        <input id="taskCode" class="input" placeholder="Mã hoàn thành">
+        <input id="taskDaily" class="input" type="number" min="1" value="1" placeholder="Giới hạn/ngày">
+        <button type="button" class="btn" onclick="ADM.createTask()">Tạo nhiệm vụ</button>
+        <div id="taskMsg" class="muted"></div>
+      </div>
+      <div id="taskList"></div>
+    </div>
+  </section>
+
+  <section id="support" class="panel">
+    <div class="sectionTitle">Ticket hỗ trợ</div>
+    <input id="supportSearch" class="search" placeholder="Tìm ticket / user / mã đơn...">
+    <div id="supportList"></div>
+  </section>
+
+  <section id="security" class="panel">
+    <div class="sectionTitle">Download gần đây</div>
+    <div id="downloadList"></div>
+    <div class="sectionTitle">Sự kiện bảo mật</div>
+    <div id="securityList"></div>
+    <div class="sectionTitle">Chống gian lận Rewards</div>
+    <div id="rewardSecurityList"></div>
+    <div class="sectionTitle">Tài khoản đang khóa thưởng</div>
+    <div id="rewardBlockedList"></div>
+  </section>
+
+  <section id="appinfo" class="panel">
+    <div class="item">
+      <h2>Cập nhật APK</h2>
+      <p>GitHub Actions build APK và GitHub Release được giữ nguyên.</p>
+      <div class="item"><b>Bản mới nhất</b><br><span class="muted">github.com/NgMingZan/M4X-STORE/releases/latest</span></div>
+    </div>
+  </section>
+</div>
+
+<div id="modal" class="modal">
+  <div class="sheet">
+    <button type="button" class="btn ghost close" onclick="document.getElementById('modal').classList.remove('open')">Đóng</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+<script src="./assets/admin.js"></script>
+<script src="./assets/admin-v8.js"></script>
+<script src="./assets/admin-premium-v15.js?v=m4x-admin-premium-v15"></script>
+</body>
+</html>
