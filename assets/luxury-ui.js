@@ -112,65 +112,24 @@
     </article>`;
   }
 
-  function promoTopup(){
-    try{
-      if(!state.me && typeof M4X?.auth==='function') return M4X.auth('login');
-      if(typeof M4X?.topup==='function') return M4X.topup(0);
-      if(typeof topup==='function') return topup(0);
-      if(typeof setView==='function') return setView('account');
-    }catch(e){console.warn('M4X promo topup',e)}
-  }
-
-  function initPromoCountdown(){
-    try{
-      if(window.__m4xPromoTimer){clearInterval(window.__m4xPromoTimer);window.__m4xPromoTimer=null}
-      const deadline=new Date('2026-09-10T00:30:46+07:00').getTime();
-      const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=String(v).padStart(2,'0')};
-      const tick=()=>{
-        const d=deadline-Date.now();
-        if(d<=0){
-          ['m4xPromoDays','m4xPromoHours','m4xPromoMinutes','m4xPromoSeconds'].forEach(id=>set(id,0));
-          const t=document.getElementById('m4xPromoDeadline');if(t)t.textContent='🚀 Ưu đãi đã kết thúc!';
-          const b=document.getElementById('m4xPromoTopupBtn');if(b){b.disabled=true;b.textContent='Ưu đãi đã kết thúc'}
-          if(window.__m4xPromoTimer){clearInterval(window.__m4xPromoTimer);window.__m4xPromoTimer=null}
-          return;
-        }
-        set('m4xPromoDays',Math.floor(d/86400000));
-        set('m4xPromoHours',Math.floor((d%86400000)/3600000));
-        set('m4xPromoMinutes',Math.floor((d%3600000)/60000));
-        set('m4xPromoSeconds',Math.floor((d%60000)/1000));
-      };
-      tick();window.__m4xPromoTimer=setInterval(tick,1000);
-    }catch(e){console.warn('M4X promo countdown',e)}
-  }
-
   function renderStoreLux(){
     const list=filtered();
     const cats=`<button class="chip ${state.activeCat==='all'?'active':''}" data-lux-cat="all">Tất cả</button>`+
       state.categories.map(c=>`<button class="chip ${String(c.id)===String(state.activeCat)?'active':''}" data-lux-cat="${c.id}">${esc(c.name)}</button>`).join('');
 
     $('view').innerHTML=`<div class="lux-store">
-      <section class="lux-hero lux-promo-hero" id="m4xPromoHero">
-        <div class="lux-hero-copy lux-promo-copy">
-          <span class="lux-eyebrow lux-promo-tag"><i></i>⚡ FLASH SALE · M4X STORE</span>
-          <div class="lux-promo-domain">m4x-store.pages.dev · Ưu đãi độc quyền</div>
-          <h1>💥 Nạp tiền nhận ngay <span>+30%</span></h1>
-          <p>👉 Nạp càng nhiều, nhận càng nhiều! Tận dụng ưu đãi để mua sắm Theme, App, AI, Tool và các sản phẩm số tại M4X STORE.</p>
-
-          <div class="lux-promo-timer" id="m4xPromoCountdown">
-            <div><b id="m4xPromoDays">00</b><small>Ngày</small></div>
-            <div><b id="m4xPromoHours">00</b><small>Giờ</small></div>
-            <div><b id="m4xPromoMinutes">00</b><small>Phút</small></div>
-            <div><b id="m4xPromoSeconds">00</b><small>Giây</small></div>
-          </div>
-
-          <div class="lux-hero-actions lux-promo-actions">
-            <button class="btn lux-primary lux-promo-btn" id="m4xPromoTopupBtn" onclick="M4XLux.promoTopup()">💰 Nạp ngay hôm nay</button>
-            <span class="lux-promo-warning" id="m4xPromoDeadline">⚠️ Đến 00:30:46 10/09/2026 · Hết giờ là hết ưu đãi!</span>
+      <section class="lux-hero">
+        <div class="lux-hero-copy">
+          <span class="lux-eyebrow"><i></i>M4X STORE · ONLINE</span>
+          <h1>Sản phẩm số <span>được chọn lọc.</span></h1>
+          <p>App Premium, AI, Theme và Tool trong một Store duy nhất. Thanh toán VietQR 24/7, quản lý đơn hàng trong tài khoản và cộng đồng realtime ngay trong M4X.</p>
+          <div class="lux-hero-actions">
+            <button class="btn lux-primary" onclick="document.getElementById('luxSearch')?.focus()">Khám phá sản phẩm</button>
+            <button class="btn ghost" onclick="setView('community')">Vào Community</button>
           </div>
         </div>
-        <div class="lux-status lux-promo-status">
-          <span><i></i>+30% số dư</span><span><i></i>VietQR</span><span><i></i>Tự động cộng</span>
+        <div class="lux-status">
+          <span><i></i>Supabase</span><span><i></i>VietQR</span><span><i></i>Community</span>
         </div>
       </section>
 
@@ -193,7 +152,6 @@
       </section>
     </div>`;
 
-    initPromoCountdown();
     $('luxSearch').oninput=e=>{state.query=e.target.value;renderStoreLux()};
     document.querySelectorAll('[data-lux-cat]').forEach(b=>b.onclick=()=>{state.activeCat=b.dataset.luxCat;renderStoreLux()});
     document.querySelectorAll('[data-lux-price]').forEach(b=>b.onclick=()=>{priceFilter=b.dataset.luxPrice;renderStoreLux()});
@@ -205,7 +163,7 @@
     window.renderStore=renderStoreLux;
   }catch(e){console.warn('M4X Luxury renderStore',e)}
 
-  window.M4XLux={favorite:toggleFav,action,promoTopup};
+  window.M4XLux={favorite:toggleFav,action};
 
   setupChrome();
   try{if(state?.view==='store')renderStoreLux()}catch(e){console.warn(e)}

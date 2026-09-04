@@ -1,0 +1,17 @@
+/* M4X STORE V18.3 — managed Hero only */
+.lux-hero.m4x-managed-hero{padding:0!important;min-height:230px!important}
+.lux-hero.m4x-managed-hero:after{display:none!important}
+.m4x-hero-grid{position:relative;z-index:2;min-height:230px;display:grid;grid-template-columns:1fr}
+.m4x-hero-grid.has-image{grid-template-columns:minmax(0,1.15fr) minmax(220px,.85fr)}
+.m4x-hero-copy{padding:24px;display:flex;flex-direction:column;justify-content:center;max-width:none!important}
+.m4x-hero-media{min-height:230px;background-size:cover;background-position:center;border-left:1px solid rgba(255,255,255,.07);position:relative}
+.m4x-hero-media:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#0a1018 0%,rgba(10,16,24,.18) 38%,rgba(10,16,24,.03) 100%)}
+.m4x-hero-eyebrow{width:max-content}.m4x-managed-hero h1{max-width:760px!important}.m4x-managed-hero p{max-width:720px!important}
+.m4x-hero-timer{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}
+.m4x-hero-timer>div{min-width:63px;padding:8px 10px;border-radius:12px;text-align:center;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.075)}
+.m4x-hero-timer b{display:block;color:#f1d27f;font-size:22px;line-height:1;font-variant-numeric:tabular-nums}.m4x-hero-timer small{display:block;margin-top:4px;color:#77869b;font-size:7px;text-transform:uppercase;letter-spacing:.7px}
+.m4x-hero-deadline{margin-top:10px;color:#ff8793;font-size:9px;font-weight:800}
+.m4x-hero-promo{background:linear-gradient(#090e17,#090e17) padding-box,linear-gradient(120deg,rgba(255,215,0,.44),#31465b 48%,rgba(255,140,0,.28)) border-box!important}
+.m4x-hero-promo:before{background:radial-gradient(circle,rgba(255,184,50,.18),rgba(255,116,0,.08) 44%,transparent 70%)!important}
+.m4x-hero-custom{background:linear-gradient(#0a1018,#0a1018) padding-box,linear-gradient(120deg,#31465b,#6e5d3a 55%,#28243d) border-box!important}
+@media(max-width:700px){.m4x-hero-grid.has-image{grid-template-columns:1fr}.m4x-hero-copy{padding:18px}.m4x-hero-media{min-height:150px;border-left:0;border-top:1px solid rgba(255,255,255,.07)}.m4x-hero-media:after{background:linear-gradient(180deg,#0a1018 0%,rgba(10,16,24,.15) 35%,transparent 100%)}.m4x-hero-timer{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.m4x-hero-timer>div{min-width:0;padding:8px 4px}.m4x-hero-timer b{font-size:19px}}
