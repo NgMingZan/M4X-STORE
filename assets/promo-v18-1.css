@@ -1,0 +1,40 @@
+/* M4X STORE V18.1 — +30% TOPUP PROMO — Luxury V16 compatible */
+#m4xPromo30.m4x-promo30{
+  position:relative;overflow:hidden;margin:14px 0 16px;
+  border-radius:22px;padding:18px;
+  border:1px solid rgba(226,193,112,.38);
+  background:
+    radial-gradient(circle at 92% 4%,rgba(237,169,57,.18),transparent 34%),
+    radial-gradient(circle at 8% 100%,rgba(110,157,255,.10),transparent 34%),
+    linear-gradient(145deg,rgba(17,21,30,.98),rgba(7,11,18,.98));
+  box-shadow:0 16px 42px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.035);
+  color:#f7f8fb;
+}
+#m4xPromo30 .m4x-promo-glow{position:absolute;right:-90px;bottom:-170px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(237,169,57,.15),transparent 68%);pointer-events:none}
+#m4xPromo30 .m4x-promo-tag{position:relative;z-index:1;display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:999px;border:1px solid rgba(226,193,112,.28);background:rgba(226,193,112,.09);color:#e8cc86;font-size:9px;font-weight:900;letter-spacing:1px}
+#m4xPromo30 .m4x-promo-main{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end}
+#m4xPromo30 .m4x-promo-title{margin:11px 0 0;font-size:clamp(25px,4.6vw,40px);font-weight:950;line-height:1.03;letter-spacing:-1.45px}
+#m4xPromo30 .m4x-promo-title strong{background:linear-gradient(135deg,#f5df9a,#d8ad51 55%,#f0c76b);-webkit-background-clip:text;background-clip:text;color:transparent}
+#m4xPromo30 .m4x-promo-sub{margin:8px 0 0;max-width:760px;color:#97a3b5;font-size:11px;line-height:1.6}
+#m4xPromo30 .m4x-promo-sub b{color:#e7d29c}
+#m4xPromo30 .m4x-promo-timer{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}
+#m4xPromo30 .m4x-promo-time{min-width:65px;padding:8px 10px;text-align:center;border-radius:13px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.035)}
+#m4xPromo30 .m4x-promo-num{display:block;color:#e8cc86;font-size:22px;font-weight:950;line-height:1;font-variant-numeric:tabular-nums}
+#m4xPromo30 .m4x-promo-label{display:block;margin-top:5px;color:#6f7c90;font-size:8px;font-weight:850;letter-spacing:.8px;text-transform:uppercase}
+#m4xPromo30 .m4x-promo-actions{display:flex;flex-direction:column;align-items:flex-end;gap:9px}
+#m4xPromo30 .m4x-promo-btn{border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px 18px;background:linear-gradient(135deg,#efd98f,#d1a84d);color:#15130e;font-size:11px;font-weight:950;box-shadow:0 10px 24px rgba(198,153,55,.16);cursor:pointer;white-space:nowrap}
+#m4xPromo30 .m4x-promo-btn:active{transform:scale(.98)}
+#m4xPromo30 .m4x-promo-deadline{max-width:255px;color:#dc8f8f;font-size:9px;font-weight:780;line-height:1.45;text-align:right}
+#m4xPromo30.m4x-promo-ended .m4x-promo-btn{opacity:.45;pointer-events:none;filter:grayscale(.5)}
+@media(max-width:720px){
+  #m4xPromo30.m4x-promo30{margin:12px 0 14px;padding:15px;border-radius:19px}
+  #m4xPromo30 .m4x-promo-main{grid-template-columns:1fr;gap:12px}
+  #m4xPromo30 .m4x-promo-title{font-size:27px}
+  #m4xPromo30 .m4x-promo-sub{font-size:10px}
+  #m4xPromo30 .m4x-promo-timer{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  #m4xPromo30 .m4x-promo-time{min-width:0;padding:8px 3px}
+  #m4xPromo30 .m4x-promo-num{font-size:19px}
+  #m4xPromo30 .m4x-promo-actions{align-items:stretch}
+  #m4xPromo30 .m4x-promo-btn{width:100%;padding:12px 14px}
+  #m4xPromo30 .m4x-promo-deadline{max-width:none;text-align:left}
+}
