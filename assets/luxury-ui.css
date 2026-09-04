@@ -375,3 +375,48 @@ body:before{
   .lux-links{grid-template-columns:1fr 1fr}
   .lux-card{border-radius:15px}.lux-cover{aspect-ratio:1.12}
 }
+
+
+
+
+
+
+/* M4X_PROMO_V18_2_START */
+.lux-hero.lux-promo-hero{
+  min-height:290px!important;
+  padding:25px!important;
+  background:
+    radial-gradient(circle at 92% 8%,rgba(255,132,0,.15),transparent 36%),
+    radial-gradient(circle at 70% 100%,rgba(141,124,255,.10),transparent 40%),
+    linear-gradient(#090e17,#090e17) padding-box,
+    linear-gradient(120deg,rgba(255,215,0,.44),#31465b 48%,rgba(255,140,0,.28)) border-box!important;
+  box-shadow:0 24px 80px rgba(0,0,0,.24),0 0 45px rgba(255,195,70,.045)!important
+}
+.lux-promo-hero:before{background:radial-gradient(circle,rgba(255,184,50,.18),rgba(255,116,0,.08) 44%,transparent 70%)!important}
+.lux-promo-copy{max-width:760px!important}
+.lux-promo-tag{color:#f5dc94!important;border-color:#574426!important;background:rgba(35,27,13,.72)!important}
+.lux-promo-domain{margin-top:11px;color:#78879b;font-size:9px;letter-spacing:.7px;font-weight:800}
+.lux-promo-hero h1{font-size:clamp(31px,5.5vw,56px)!important;max-width:760px!important;margin-top:12px!important}
+.lux-promo-hero h1 span{background:linear-gradient(95deg,#ffe78f,#ffb52e 56%,#ff8b24)!important;-webkit-background-clip:text!important;background-clip:text!important;color:transparent!important}
+.lux-promo-hero p{max-width:720px!important}
+.lux-promo-timer{display:flex;gap:8px;flex-wrap:wrap;margin-top:17px}
+.lux-promo-timer>div{min-width:68px;padding:9px 12px;border-radius:13px;text-align:center;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.075);backdrop-filter:blur(8px)}
+.lux-promo-timer b{display:block;color:#f1d27f;font-size:25px;line-height:1;font-variant-numeric:tabular-nums}
+.lux-promo-timer small{display:block;margin-top:5px;color:#77869b;font-size:7px;text-transform:uppercase;letter-spacing:.8px}
+.lux-promo-actions{align-items:center!important;margin-top:15px!important}
+.lux-promo-btn{min-height:43px!important;padding-left:19px!important;padding-right:19px!important}
+.lux-promo-warning{color:#ff818e;font-size:9px;font-weight:800;line-height:1.4;max-width:310px}
+.lux-promo-status span:first-child{color:#e4cc8a!important;border-color:#493b22!important}
+@media(max-width:640px){
+  .lux-hero.lux-promo-hero{min-height:0!important;padding:20px!important}
+  .lux-promo-hero h1{font-size:35px!important;letter-spacing:-1.7px!important}
+  .lux-promo-timer{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .lux-promo-timer>div{min-width:0;padding:8px 5px}
+  .lux-promo-timer b{font-size:21px}
+  .lux-promo-actions{display:grid!important;grid-template-columns:1fr!important;width:100%}
+  .lux-promo-btn{width:100%!important}
+  .lux-promo-warning{max-width:none;text-align:center}
+  .lux-promo-status{position:static!important;margin-top:15px!important;justify-content:flex-start!important}
+}
+/* M4X_PROMO_V18_2_END */
+
