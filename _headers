@@ -1,0 +1,11 @@
+
+# M4X_TELEGRAM_V19_START
+/index.html
+  Cache-Control: no-cache, must-revalidate
+/telegram-admin.html
+  Cache-Control: no-cache, must-revalidate
+/assets/telegram-miniapp-v19.js
+  Cache-Control: no-cache, must-revalidate
+/assets/online-update-v19.js
+  Cache-Control: no-cache, must-revalidate
+# M4X_TELEGRAM_V19_END
