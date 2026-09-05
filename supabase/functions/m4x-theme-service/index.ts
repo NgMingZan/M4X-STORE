@@ -139,6 +139,45 @@ async function triggerWorker(jobId: string) {
   if (rt?.waitUntil) rt.waitUntil(task); else await task;
 }
 
+async function prepareUpload(body: any) {
+  const pricing = await getPricing();
+  if (!pricing.enabled) throw new Error("Dịch vụ AI Việt hóa đang tạm đóng.");
+
+  const originalName = safeName(body?.file_name || "theme.mtz");
+  if (!/\.mtz$/i.test(originalName)) throw new Error("Chỉ hỗ trợ file .mtz.");
+
+  const fileSize = Number(body?.file_size || 0);
+  const maxMtzBytes = Number(pricing.max_mtz_mb || 50) * 1024 * 1024;
+  if (!fileSize) throw new Error("File MTZ rỗng.");
+  if (fileSize > maxMtzBytes) {
+    throw new Error(`MTZ ${(fileSize/1048576).toFixed(1)}MB vượt giới hạn ${pricing.max_mtz_mb}MB.`);
+  }
+
+  const rawMode = clip(body?.mode || "full", 16).toLowerCase();
+  const mode = ["text", "scan", "full"].includes(rawMode) ? rawMode : "full";
+  const sourcePath = `source/${crypto.randomUUID()}/${originalName}`;
+
+  const sb = adminClient();
+  const { data, error } = await sb.storage
+    .from("theme-translation-private")
+    .createSignedUploadUrl(sourcePath);
+
+  if (error || !data?.token) {
+    throw new Error(`Không tạo được link upload: ${error?.message || "unknown"}`);
+  }
+
+  return {
+    ok: true,
+    upload: {
+      bucket: "theme-translation-private",
+      path: sourcePath,
+      token: data.token,
+    },
+    mode,
+    max_mtz_mb: Number(pricing.max_mtz_mb || 50),
+  };
+}
+
 async function quote(req: Request) {
   const pricing = await getPricing();
   if (!pricing.enabled) throw new Error("Dịch vụ AI Việt hóa đang tạm đóng.");
@@ -206,6 +245,132 @@ async function quote(req: Request) {
   if (upload.error) throw new Error(`Không lưu được MTZ: ${upload.error.message}`);
 
   const contact = clip(form.get("contact"), 160);
+  const { data: created, error: createError } = await sb.rpc("m4x_create_theme_paid_order", {
+    p_source_file_name: originalName,
+    p_source_path: sourcePath,
+    p_source_sha256: sourceHash,
+    p_source_mtz_bytes: mtzBytes.length,
+    p_lockscreen_entry: String(lockEntry.name),
+    p_lockscreen_bytes: lockBytes.length,
+    p_image_count: imageEntries.length,
+    p_text_file_count: textEntries.length,
+    p_text_chars: textChars,
+    p_base_price: basePrice,
+    p_size_fee: sizeFee,
+    p_image_fee: imageFee,
+    p_text_fee: textFee,
+    p_amount: amount,
+    p_customer_contact: contact || null,
+    p_quote_minutes: Number(pricing.quote_minutes || 30),
+  });
+  if (createError || !created?.order_code) {
+    await sb.storage.from("theme-translation-private").remove([sourcePath]).catch(() => {});
+    throw new Error(createError?.message || "Không tạo được đơn dịch theme.");
+  }
+  const { error: modeError } = await sb.from("m4x_theme_paid_jobs")
+    .update({ mode }).eq("id", created.job_id);
+  if (modeError) {
+    throw new Error("Chưa chạy SQL V21.6: " + modeError.message);
+  }
+  const bank = bankInfo(amount, String(created.order_code));
+  if (!bank.account_number) {
+    await sb.from("orders").update({ status: "cancelled" }).eq("id", created.order_id);
+    throw new Error("Chưa cấu hình M4X_BANK_ACCOUNT trong Edge Function Secrets.");
+  }
+  return {
+    ok: true,
+    quote: {
+      mode,
+      file_name: originalName,
+      mtz_mb: Number((mtzBytes.length / 1048576).toFixed(2)),
+      lockscreen_entry: String(lockEntry.name),
+      lockscreen_mb: Number(lockMb.toFixed(2)),
+      images: imageEntries.length,
+      text_files: textEntries.length,
+      text_chars: textChars,
+      base_price: basePrice,
+      size_fee: sizeFee,
+      image_fee: imageFee,
+      text_fee: textFee,
+      amount,
+    },
+    order: {
+      job_id: created.job_id,
+      order_code: created.order_code,
+      access_token: created.access_token,
+      amount,
+      expires_at: created.expires_at,
+    },
+    bank,
+    image_edit_enabled: imageEditEnabled,
+  };
+}
+
+async function quoteUploaded(body: any) {
+  const pricing = await getPricing();
+  if (!pricing.enabled) throw new Error("Dịch vụ AI Việt hóa đang tạm đóng.");
+  const rawMode = clip(body?.mode || "full", 16).toLowerCase();
+  const mode = ["text", "scan", "full"].includes(rawMode) ? rawMode : "full";
+  const originalName = safeName(body?.file_name || "theme.mtz");
+  if (!/\.mtz$/i.test(originalName)) throw new Error("Chỉ hỗ trợ file .mtz.");
+  const sourcePath = clip(body?.source_path, 500);
+  if (!/^source\/[0-9a-f-]{36}\//i.test(sourcePath)) throw new Error("Đường dẫn upload không hợp lệ.");
+  const expectedSize = Number(body?.file_size || 0);
+  const maxMtzBytes = Number(pricing.max_mtz_mb || 50) * 1024 * 1024;
+  if (expectedSize <= 0) throw new Error("File MTZ rỗng.");
+  if (expectedSize > maxMtzBytes) throw new Error(`MTZ ${(expectedSize/1048576).toFixed(1)}MB vượt giới hạn ${pricing.max_mtz_mb}MB.`);
+  const sb = adminClient();
+  const dl = await sb.storage.from("theme-translation-private").download(sourcePath);
+  if (dl.error || !dl.data) throw new Error(`Không tải được MTZ đã upload: ${dl.error?.message || "unknown"}`);
+  const mtzBytes = new Uint8Array(await dl.data.arrayBuffer());
+  if (!mtzBytes.length) throw new Error("File MTZ rỗng.");
+  if (mtzBytes.length > maxMtzBytes) throw new Error(`MTZ ${(mtzBytes.length/1048576).toFixed(1)}MB vượt giới hạn ${pricing.max_mtz_mb}MB.`);
+  if (expectedSize && mtzBytes.length !== expectedSize) throw new Error("Dung lượng file upload không khớp file đã chọn.");
+
+  let outer: JSZip;
+  try { outer = await JSZip.loadAsync(mtzBytes); } catch (_) { throw new Error("File không phải MTZ/ZIP hợp lệ."); }
+  const outerEntries = Object.values(outer.files).filter((f: any) => !f.dir) as any[];
+  const lockEntry = outerEntries.find((e: any) => /(?:^|\/)lockscreen(?:\.zip)?$/i.test(String(e.name)))
+    || outerEntries.find((e: any) => /(?:^|\/)lockscreen[^/]*$/i.test(String(e.name)));
+  if (!lockEntry) throw new Error("Không tìm thấy component lockscreen trong MTZ.");
+  const lockBytes = await lockEntry.async("uint8array");
+  const lockMb = lockBytes.length / 1048576;
+  if (lockMb > Number(pricing.max_lockscreen_mb || 18)) {
+    throw new Error(`Lockscreen ${lockMb.toFixed(1)}MB vượt giới hạn ${pricing.max_lockscreen_mb}MB.`);
+  }
+
+  let lockZip: JSZip;
+  try { lockZip = await JSZip.loadAsync(lockBytes); } catch (_) { throw new Error("Component lockscreen không phải ZIP hợp lệ."); }
+  const entries = Object.values(lockZip.files).filter((f: any) => !f.dir) as any[];
+  const imageEntries = entries.filter((e: any) => /\.(?:png|jpe?g|webp)$/i.test(String(e.name || "")));
+  if (imageEntries.length > Number(pricing.max_images || 20)) {
+    throw new Error(`Lockscreen có ${imageEntries.length} ảnh, vượt giới hạn ${pricing.max_images} ảnh.`);
+  }
+  const imageEditEnabled = env("M4X_THEME_IMAGE_EDIT_ENABLED", "false").toLowerCase() === "true";
+  const requireImageEdit = env("M4X_THEME_PAID_REQUIRE_IMAGE_EDIT", "true").toLowerCase() !== "false";
+  if (mode === "full" && imageEntries.length > 0 && requireImageEdit && !imageEditEnabled) {
+    throw new Error("Dịch vụ trả phí có xử lý ảnh nhưng M4X_THEME_IMAGE_EDIT_ENABLED chưa bật. Admin cần thêm secret = true trước khi nhận đơn.");
+  }
+  const textEntries = entries.filter((e: any) => {
+    const n = String(e.name || "");
+    return /\.(?:xml|properties|ini|conf|cfg|txt)$/i.test(n)
+      || /(?:^|\/)(?:manifest|config|settings?|strings?)(?:\.[^/]*)?$/i.test(n);
+  });
+  const unique = new Set<string>();
+  for (const e of textEntries) {
+    let content = "";
+    try { content = await e.async("string"); } catch (_) { continue; }
+    if (/\.xml$/i.test(e.name)) collectStringsFromXml(content, unique);
+    else collectStringsFromProperties(content, unique);
+  }
+  const textChars = Array.from(unique).reduce((n, s) => n + s.length, 0);
+  const basePrice = Math.max(10000, Number(pricing.base_price || 10000));
+  const sizeFee = tierFee(lockMb, pricing.size_tiers, "Dung lượng lockscreen");
+  const imageFee = mode === "full" ? tierFee(imageEntries.length, pricing.image_tiers, "Số ảnh") : 0;
+  const textFee = tierFee(textChars, pricing.text_tiers, "Lượng văn bản");
+  const amount = Math.max(10000, basePrice + sizeFee + imageFee + textFee);
+  const sourceHash = await sha256Bytes(mtzBytes);
+  const contact = clip(body?.contact, 160);
   const { data: created, error: createError } = await sb.rpc("m4x_create_theme_paid_order", {
     p_source_file_name: originalName,
     p_source_path: sourcePath,
@@ -341,6 +506,8 @@ Deno.serve(async (req) => {
       const p = await getPricing();
       return json({ ok: true, pricing: publicPricing(p), image_edit_enabled: env("M4X_THEME_IMAGE_EDIT_ENABLED", "false").toLowerCase() === "true" });
     }
+    if (action === "prepare_upload") return json(await prepareUpload(body));
+    if (action === "quote_uploaded") return json(await quoteUploaded(body));
     if (action === "status") return json(await status(body, false));
     if (action === "retry") return json(await status(body, true));
     return json({ ok: false, error: "Action không hợp lệ" }, 400);

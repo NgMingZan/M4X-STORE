@@ -4,6 +4,7 @@ const $=s=>document.querySelector(s),C=window.M4X_CONFIG||{};
 const base=String(C.SUPABASE_URL||'').replace(/\/$/,'');
 const key=String(C.SUPABASE_ANON_KEY||C.SUPABASE_PUBLISHABLE_KEY||'');
 const endpoint=base?`${base}/functions/v1/m4x-theme-service`:'';
+const storageClient=window.supabase?.createClient?.(base,key);
 const MODE={
  text:{label:'⚡ Chỉ văn bản',note:'Đã chọn: ⚡ Chỉ dịch XML/config. Ảnh giữ nguyên.'},
  scan:{label:'🔎 Văn bản + quét chữ ảnh',note:'Đã chọn: 🔎 Dịch text + quét ảnh. Ảnh giữ nguyên.'},
@@ -21,7 +22,79 @@ function renderPricing(p){if(!p)return;$('#pricingBox').innerHTML=`<div class="v
 async function loadPricing(){try{const j=await api({action:'pricing'});renderPricing(j.pricing);if(!j.image_edit_enabled)$('#pricingBox').insertAdjacentHTML('beforeend','<div class="v21-note warn">FULL ảnh hiện chưa sẵn sàng vì Admin chưa bật M4X_THEME_IMAGE_EDIT_ENABLED.</div>')}catch(e){$('#pricingBox').innerHTML=`<div class="v21-note err">${esc(e.message)}</div>`}}
 function setMsg(msg,type='warn'){const el=$('#analyzeMsg');el.className=`v21-note ${type}`;el.textContent=msg;el.classList.remove('v21-hidden')}
 function setFile(f){if(f&&!/\.mtz$/i.test(String(f.name||''))){state.file=null;$('#analyzeBtn').disabled=true;$('#fileInfo').textContent='Chưa chọn file';setMsg('Chỉ nhận file .mtz','err');return}state.file=f||null;$('#analyzeBtn').disabled=!state.file;$('#fileInfo').textContent=f?`${f.name} · ${(f.size/1048576).toFixed(2)} MB`:'Chưa chọn file'}
-async function analyze(){if(!state.file)return;const btn=$('#analyzeBtn');btn.disabled=true;btn.textContent='⏳ Đang mở lockscreen & tính giá...';setMsg(`Đang upload · ${MODE[state.mode].label}`,'warn');try{const fd=new FormData();fd.append('file',state.file,state.file.name);fd.append('contact',$('#contact').value.trim());fd.append('mode',state.mode);const r=await fetch(endpoint,{method:'POST',headers:{apikey:key,Authorization:`Bearer ${key}`},body:fd});const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok)throw new Error(j.error||`HTTP ${r.status}`);state.quote=j;localStorage.setItem('m4x_theme_paid_v21',JSON.stringify({order_code:j.order.order_code,access_token:j.order.access_token,expires_at:j.order.expires_at,mode:j.quote?.mode||state.mode}));renderQuote(j);setMsg('✅ Đã phân tích lockscreen và khóa báo giá theo file.','ok');startPoll()}catch(e){setMsg(e.message,'err')}finally{btn.disabled=!state.file;btn.textContent='🔍 Gửi MTZ & báo giá'}}
+async function analyze(){
+  if(!state.file)return;
+  if(!storageClient){
+    setMsg('Không khởi tạo được Supabase Storage. Hãy tải lại trang.','err');
+    return;
+  }
+
+  const btn=$('#analyzeBtn');
+  const contact=$('#contact').value.trim();
+  btn.disabled=true;
+
+  try{
+    btn.textContent='🔐 Đang tạo phiên upload...';
+    setMsg(`Đang chuẩn bị upload · ${MODE[state.mode].label}`,'warn');
+
+    const prep=await api({
+      action:'prepare_upload',
+      file_name:state.file.name,
+      file_size:state.file.size,
+      mode:state.mode,
+      contact
+    });
+
+    if(!prep?.upload?.path||!prep?.upload?.token){
+      throw new Error('Không nhận được link upload Storage.');
+    }
+
+    btn.textContent=`⬆️ Đang tải ${(state.file.size/1048576).toFixed(1)}MB lên Storage...`;
+    setMsg('Đang tải MTZ trực tiếp lên Supabase Storage...','warn');
+
+    const {error:uploadError}=await storageClient.storage
+      .from(prep.upload.bucket||'theme-translation-private')
+      .uploadToSignedUrl(
+        prep.upload.path,
+        prep.upload.token,
+        state.file,
+        {contentType:'application/octet-stream'}
+      );
+
+    if(uploadError){
+      throw new Error('Upload Storage lỗi: '+uploadError.message);
+    }
+
+    btn.textContent='🔍 Đang mở lockscreen & tính giá...';
+    setMsg('Upload xong. Đang phân tích lockscreen và tính giá...','warn');
+
+    const j=await api({
+      action:'quote_uploaded',
+      source_path:prep.upload.path,
+      file_name:state.file.name,
+      file_size:state.file.size,
+      mode:state.mode,
+      contact
+    });
+
+    state.quote=j;
+    localStorage.setItem('m4x_theme_paid_v21',JSON.stringify({
+      order_code:j.order.order_code,
+      access_token:j.order.access_token,
+      expires_at:j.order.expires_at,
+      mode:j.quote?.mode||state.mode
+    }));
+
+    renderQuote(j);
+    setMsg('✅ Upload + phân tích lockscreen thành công.','ok');
+    startPoll();
+  }catch(e){
+    setMsg(e?.message||String(e),'err');
+  }finally{
+    btn.disabled=!state.file;
+    btn.textContent='🔍 Gửi MTZ & báo giá';
+  }
+}
 function renderQuote(j){const q=j.quote,o=j.order,b=j.bank;$('#quoteCard').classList.remove('v21-hidden');$('#paymentCard').classList.remove('v21-hidden');$('#statusCard').classList.remove('v21-hidden');$('#qMode').textContent=MODE[q.mode]?.label||q.mode||MODE[state.mode].label;$('#qSize').textContent=`${q.lockscreen_mb} MB`;$('#qImages').textContent=fmt(q.images);$('#qText').textContent=fmt(q.text_chars);$('#qBase').textContent=money(q.base_price);$('#qSizeFee').textContent=q.size_fee?'+'+money(q.size_fee):'0đ';$('#qImageFee').textContent=q.image_fee?'+'+money(q.image_fee):(q.mode==='full'?'0đ':'Không tính');$('#qTextFee').textContent=q.text_fee?'+'+money(q.text_fee):'0đ';$('#qTotal').textContent=money(q.amount);$('#payAmount').textContent=money(o.amount);$('#transferContent').textContent=b.transfer_content;$('#bankCode').textContent=b.bank_code;$('#bankAccount').textContent=b.account_number;$('#bankName').textContent=b.account_name||'';$('#qrImg').src=b.qr_url;state.quote=j;startCountdown(o.expires_at);setStatusUI({order:{status:'pending'},job:{status:'waiting_payment',progress:0,stage:'Chờ SePay xác nhận',mode:q.mode,stats:{mode:q.mode}}});window.scrollTo({top:$('#quoteCard').offsetTop-12,behavior:'smooth'})}
 function startCountdown(expires){clearInterval(state.timer);const tick=()=>{const ms=new Date(expires).getTime()-Date.now(),el=$('#expireText');if(ms<=0){el.textContent='⏰ Báo giá đã hết hạn.';clearInterval(state.timer);return}const m=Math.floor(ms/60000),s=Math.floor(ms%60000/1000);el.textContent=`⏳ Giữ báo giá còn ${m}:${String(s).padStart(2,'0')}`};tick();state.timer=setInterval(tick,1000)}
 async function saved(){try{return JSON.parse(localStorage.getItem('m4x_theme_paid_v21')||'null')}catch{return null}}
