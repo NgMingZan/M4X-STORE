@@ -49,7 +49,7 @@ jobs:
         run: |
           rm -rf android-app/app/src/main/assets
           mkdir -p android-app/app/src/main/assets/assets
-          cp index.html admin.html theme-translator.html android-app/app/src/main/assets/
+          cp index.html admin.html android-app/app/src/main/assets/
           cp -r assets/* android-app/app/src/main/assets/assets/
           cat > android-app/app/src/main/assets/config.js <<EOF2
           window.M4X_CONFIG = {

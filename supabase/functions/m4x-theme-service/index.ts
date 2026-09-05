@@ -143,6 +143,8 @@ async function quote(req: Request) {
   const pricing = await getPricing();
   if (!pricing.enabled) throw new Error("Dịch vụ AI Việt hóa đang tạm đóng.");
   const form = await req.formData();
+  const rawMode = clip(form.get("mode") || "full", 16).toLowerCase();
+  const mode = ["text", "scan", "full"].includes(rawMode) ? rawMode : "full";
   const file = form.get("file");
   if (!(file instanceof File)) throw new Error("Hãy chọn file .mtz.");
   const originalName = safeName(file.name || "theme.mtz");
@@ -173,7 +175,7 @@ async function quote(req: Request) {
   }
   const imageEditEnabled = env("M4X_THEME_IMAGE_EDIT_ENABLED", "false").toLowerCase() === "true";
   const requireImageEdit = env("M4X_THEME_PAID_REQUIRE_IMAGE_EDIT", "true").toLowerCase() !== "false";
-  if (imageEntries.length > 0 && requireImageEdit && !imageEditEnabled) {
+  if (mode === "full" && imageEntries.length > 0 && requireImageEdit && !imageEditEnabled) {
     throw new Error("Dịch vụ trả phí có xử lý ảnh nhưng M4X_THEME_IMAGE_EDIT_ENABLED chưa bật. Admin cần thêm secret = true trước khi nhận đơn.");
   }
   const textEntries = entries.filter((e: any) => {
@@ -191,7 +193,7 @@ async function quote(req: Request) {
   const textChars = Array.from(unique).reduce((n, s) => n + s.length, 0);
   const basePrice = Math.max(10000, Number(pricing.base_price || 10000));
   const sizeFee = tierFee(lockMb, pricing.size_tiers, "Dung lượng lockscreen");
-  const imageFee = tierFee(imageEntries.length, pricing.image_tiers, "Số ảnh");
+  const imageFee = mode === "full" ? tierFee(imageEntries.length, pricing.image_tiers, "Số ảnh") : 0;
   const textFee = tierFee(textChars, pricing.text_tiers, "Lượng văn bản");
   const amount = Math.max(10000, basePrice + sizeFee + imageFee + textFee);
   const sourceHash = await sha256Bytes(mtzBytes);
@@ -226,6 +228,11 @@ async function quote(req: Request) {
     await sb.storage.from("theme-translation-private").remove([sourcePath]).catch(() => {});
     throw new Error(createError?.message || "Không tạo được đơn dịch theme.");
   }
+  const { error: modeError } = await sb.from("m4x_theme_paid_jobs")
+    .update({ mode }).eq("id", created.job_id);
+  if (modeError) {
+    throw new Error("Chưa chạy SQL V21.6: " + modeError.message);
+  }
   const bank = bankInfo(amount, String(created.order_code));
   if (!bank.account_number) {
     await sb.from("orders").update({ status: "cancelled" }).eq("id", created.order_id);
@@ -234,6 +241,7 @@ async function quote(req: Request) {
   return {
     ok: true,
     quote: {
+      mode,
       file_name: originalName,
       mtz_mb: Number((mtzBytes.length / 1048576).toFixed(2)),
       lockscreen_entry: String(lockEntry.name),
@@ -310,7 +318,7 @@ async function status(body: any, allowRetry = false) {
     ok: true,
     order: { code: order.order_code, status: order.status, amount: Number(order.amount), expires_at: order.expires_at, paid_at: order.paid_at },
     job: {
-      id: job.id, status: job.status, progress: Number(job.progress || 0), stage: job.stage || "",
+      id: job.id, mode: job.mode || "full", status: job.status, progress: Number(job.progress || 0), stage: job.stage || "",
       source_file_name: job.source_file_name, lockscreen_mb: Number(job.lockscreen_bytes || 0) / 1048576,
       images: Number(job.image_count || 0), text_chars: Number(job.text_chars || 0),
       amount: Number(job.amount || order.amount), result_file_name: job.result_file_name || null,

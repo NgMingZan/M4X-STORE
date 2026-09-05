@@ -425,11 +425,9 @@ async function processPaidJob(jobId: string) {
   const { data: job, error: loadError } = await sb.from("m4x_theme_paid_jobs").select("*").eq("id", jobId).maybeSingle();
   if (loadError) throw loadError;
   if (!job) throw new Error("Không tìm thấy job V21.");
-  const rawMode = String(job.mode || "full").toLowerCase();
-  const mode = ["text", "scan", "full"].includes(rawMode) ? rawMode : "full";
 
   const stats: any = {
-    mode, files: 0, text_files: 0, unique_strings: 0, replacements: 0,
+    mode: "full", files: 0, text_files: 0, unique_strings: 0, replacements: 0,
     cache_hits: 0, ai_translated: 0, images_scanned: 0, images_with_text: 0,
     images_edited: 0, images_skipped: 0, warnings: [], image_texts: [],
   };
@@ -489,75 +487,56 @@ async function processPaidJob(jobId: string) {
       }
     }
 
-    if (mode === "text") {
-      await updatePaidJob(jobId, { progress: 80, stage: "⚡ Đã dịch văn bản · bỏ qua ảnh", stats });
-    } else {
-      await updatePaidJob(jobId, { progress: 45, stage: "Đã dịch text · đang quét ảnh", stats });
-      const imageEntries = entries.filter((e: any) => /\.(?:png|jpe?g|webp)$/i.test(String(e.name || ""))).slice(0, 20);
-      const imageMaxBytes = Math.max(256 * 1024, (Number(env("M4X_THEME_IMAGE_INPUT_MAX_MB", "3.5")) || 3.5) * 1024 * 1024);
+    await updatePaidJob(jobId, { progress: 45, stage: "Đã dịch text · đang quét ảnh", stats });
+    const imageEntries = entries.filter((e: any) => /\.(?:png|jpe?g|webp)$/i.test(String(e.name || ""))).slice(0, 20);
+    const imageMaxBytes = Math.max(256 * 1024, (Number(env("M4X_THEME_IMAGE_INPUT_MAX_MB", "3.5")) || 3.5) * 1024 * 1024);
+    const scanned = await mapLimit(imageEntries, 2, async (e: any) => {
+      try {
+        const bytes = await e.async("uint8array");
+        if (bytes.length > imageMaxBytes) return { name: e.name, bytes, scan: null, skip: "Ảnh quá lớn để quét" };
+        const scan = await inspectImage(bytes, mimeFromName(e.name));
+        return { name: e.name, bytes, scan, skip: "" };
+      } catch (err) {
+        return { name: e.name, bytes: null, scan: null, skip: clip(err instanceof Error ? err.message : String(err), 220) };
+      }
+    });
+    stats.images_scanned = scanned.filter((x: any) => x.scan).length;
+    const foreign = scanned.filter((x: any) => x.scan?.has_non_vietnamese_text);
+    stats.images_with_text = foreign.length;
+    stats.image_texts = foreign.slice(0, 20).map((x: any) => ({ name: x.name, texts: x.scan?.texts || [] }));
+    stats.images_skipped += scanned.filter((x: any) => x.skip).length;
 
-      const scanned = await mapLimit(imageEntries, 2, async (e: any) => {
+    await updatePaidJob(jobId, { progress: 62, stage: `Phát hiện ${foreign.length} ảnh có chữ cần Việt hóa`, stats });
+    if (foreign.length) {
+      if (env("M4X_THEME_IMAGE_EDIT_ENABLED", "false").toLowerCase() !== "true") {
+        throw new Error("Phát hiện ảnh có chữ nhưng M4X_THEME_IMAGE_EDIT_ENABLED chưa bật. Bật secret = true rồi bấm Thử lại; khách không cần thanh toán lần nữa.");
+      }
+      const editMax = Math.max(1, Math.min(20, Number(env("M4X_THEME_PAID_IMAGE_EDIT_MAX", "20")) || 20));
+      const toEdit = foreign.slice(0, editMax);
+      for (let i = 0; i < toEdit.length; i++) {
+        const item: any = toEdit[i];
+        await updatePaidJob(jobId, {
+          progress: Math.min(88, 64 + Math.round(((i + 1) / Math.max(1, toEdit.length)) * 22)),
+          stage: `Đang Việt hóa ảnh ${i + 1}/${toEdit.length}`,
+          stats,
+        });
         try {
-          const bytes = await e.async("uint8array");
-          if (bytes.length > imageMaxBytes) return { name: e.name, bytes, scan: null, skip: "Ảnh quá lớn để quét" };
-          const scan = await inspectImage(bytes, mimeFromName(e.name));
-          return { name: e.name, bytes, scan, skip: "" };
-        } catch (err) {
-          return { name: e.name, bytes: null, scan: null, skip: clip(err instanceof Error ? err.message : String(err), 220) };
-        }
-      });
-
-      stats.images_scanned = scanned.filter((x: any) => x.scan).length;
-      const foreign = scanned.filter((x: any) => x.scan?.has_non_vietnamese_text);
-      stats.images_with_text = foreign.length;
-      stats.image_texts = foreign.slice(0, 20).map((x: any) => ({ name: x.name, texts: x.scan?.texts || [] }));
-      stats.images_skipped += scanned.filter((x: any) => x.skip).length;
-
-      await updatePaidJob(jobId, { progress: 62, stage: `Phát hiện ${foreign.length} ảnh có chữ cần Việt hóa`, stats });
-
-      if (mode === "scan") {
-        if (foreign.length) stats.warnings.push(`🔎 Phát hiện ${foreign.length} ảnh có chữ. Chế độ SCAN giữ nguyên ảnh.`);
-        await updatePaidJob(jobId, { progress: 82, stage: `🔎 Đã quét ${stats.images_scanned} ảnh · không sửa ảnh`, stats });
-      } else if (foreign.length) {
-        if (env("M4X_THEME_IMAGE_EDIT_ENABLED", "false").toLowerCase() !== "true") {
-          throw new Error("Phát hiện ảnh có chữ nhưng M4X_THEME_IMAGE_EDIT_ENABLED chưa bật.");
-        }
-
-        const editMax = Math.max(1, Math.min(20, Number(env("M4X_THEME_PAID_IMAGE_EDIT_MAX", "20")) || 20));
-        const toEdit = foreign.slice(0, editMax);
-
-        for (let i = 0; i < toEdit.length; i++) {
-          const item: any = toEdit[i];
-
-          await updatePaidJob(jobId, {
-            progress: Math.min(88, 64 + Math.round(((i + 1) / Math.max(1, toEdit.length)) * 22)),
-            stage: `🖼 Đang Việt hóa ảnh ${i + 1}/${toEdit.length}`,
-            stats,
-          });
-
-          try {
-            if (!item.bytes) continue;
-            const srcMime = mimeFromName(item.name);
-            const edited = await editImageToVietnamese(item.bytes, srcMime, item.scan);
-
-            if (!mimeMatchesPath(edited.mime, item.name)) {
-              stats.images_skipped++;
-              stats.warnings.push(`${item.name}: AI trả ${edited.mime}, khác định dạng gốc nên giữ ảnh cũ.`);
-              continue;
-            }
-
-            zip.file(item.name, edited.bytes);
-            stats.images_edited++;
-          } catch (err) {
+          if (!item.bytes) continue;
+          const srcMime = mimeFromName(item.name);
+          const edited = await editImageToVietnamese(item.bytes, srcMime, item.scan);
+          if (!mimeMatchesPath(edited.mime, item.name)) {
             stats.images_skipped++;
-            stats.warnings.push(`${item.name}: ${clip(err instanceof Error ? err.message : String(err), 240)}`);
+            stats.warnings.push(`${item.name}: AI trả ${edited.mime}, khác định dạng gốc nên giữ ảnh cũ.`);
+            continue;
           }
-        }
-
-        if (foreign.length > editMax) {
-          stats.warnings.push(`Còn ${foreign.length - editMax} ảnh chưa sửa do giới hạn ${editMax}.`);
+          zip.file(item.name, edited.bytes);
+          stats.images_edited++;
+        } catch (err) {
+          stats.images_skipped++;
+          stats.warnings.push(`${item.name}: ${clip(err instanceof Error ? err.message : String(err), 240)}`);
         }
       }
+      if (foreign.length > editMax) stats.warnings.push(`Còn ${foreign.length - editMax} ảnh chưa sửa do giới hạn ${editMax}.`);
     }
 
     await updatePaidJob(jobId, { progress: 90, stage: "Đang đóng gói lockscreen", stats });

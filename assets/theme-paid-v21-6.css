@@ -1,0 +1,8 @@
+.v216-modes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.v216-mode{position:relative;text-align:left;padding:15px;border:1px solid rgba(255,255,255,.11);border-radius:18px;background:rgba(255,255,255,.035);color:inherit;cursor:pointer;min-height:118px}
+.v216-mode b{display:block;font-size:16px;margin-bottom:8px}.v216-mode span{display:block;color:#8faabd;font-size:13px;line-height:1.45}
+.v216-mode em{position:absolute;right:9px;top:9px;font-style:normal;font-size:10px;font-weight:800;padding:4px 7px;border-radius:999px;background:rgba(80,220,160,.14);color:#77e6b1}
+.v216-mode.active{border-color:rgba(64,170,255,.75);box-shadow:0 0 0 1px rgba(64,170,255,.22) inset,0 10px 32px rgba(0,120,255,.12);background:linear-gradient(145deg,rgba(32,133,255,.14),rgba(95,53,255,.08))}
+.v216-mode-summary{display:flex;justify-content:space-between;gap:16px;padding:12px 14px;margin-bottom:12px;border-radius:15px;background:rgba(72,140,255,.08);border:1px solid rgba(72,140,255,.16)}
+.v216-status-mode{font-size:12px;font-weight:800;color:#77bfff;margin:3px 0 4px}.v216-stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding:12px;border-radius:15px;background:rgba(255,255,255,.035);font-size:13px;color:#9bb3c7}.v216-stats b{color:#fff}.v216-stats span{opacity:.35}
+@media(max-width:720px){.v216-modes{grid-template-columns:1fr}.v216-mode{min-height:0}}
