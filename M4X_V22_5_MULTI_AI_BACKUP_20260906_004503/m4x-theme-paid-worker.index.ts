@@ -251,124 +251,6 @@ async function translateOpenAI(items: { i: number; s: string }[]) {
   if (!Array.isArray(parsed)) throw new Error("OpenAI không trả JSON bản dịch hợp lệ.");
   return { rows: parsed, provider: "openai", model };
 }
-
-// ===== M4X V22.5 MULTI-AI FREE FAILOVER =====
-function chatText(j: any) {
-  return String(j?.choices?.[0]?.message?.content || "").trim();
-}
-
-async function translateGroq(items: { i: number; s: string }[]) {
-  const key = env("GROQ_API_KEY");
-  if (!key) return null;
-  const model = env("GROQ_THEME_MODEL", "qwen/qwen3.6-27b");
-  const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: translationPrompt(items) }],
-      temperature: 0.1,
-      max_tokens: 4096
-    }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j?.error?.message || `Groq lỗi ${r.status}`);
-  const parsed = parseJsonLoose(chatText(j));
-  const rows = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.rows) ? parsed.rows : null);
-  if (!Array.isArray(rows)) throw new Error("Groq không trả JSON bản dịch hợp lệ.");
-  return { rows, provider: "groq", model };
-}
-
-async function translateMistral(items: { i: number; s: string }[]) {
-  const key = env("MISTRAL_API_KEY");
-  if (!key) return null;
-  const model = env("MISTRAL_THEME_MODEL", "mistral-small-latest");
-  const r = await fetch("https://api.mistral.ai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: translationPrompt(items) }],
-      temperature: 0.1,
-      max_tokens: 4096
-    }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j?.message || j?.error?.message || `Mistral lỗi ${r.status}`);
-  const parsed = parseJsonLoose(chatText(j));
-  const rows = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.rows) ? parsed.rows : null);
-  if (!Array.isArray(rows)) throw new Error("Mistral không trả JSON bản dịch hợp lệ.");
-  return { rows, provider: "mistral", model };
-}
-
-async function translateOpenRouter(items: { i: number; s: string }[]) {
-  const key = env("OPENROUTER_API_KEY");
-  if (!key) return null;
-  const model = env("OPENROUTER_TEXT_MODEL", "openrouter/free");
-  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${key}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": env("PUBLIC_STORE_URL", "https://m4x-store.pages.dev"),
-      "X-Title": "M4X STORE AI Theme"
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: translationPrompt(items) }],
-      temperature: 0.1,
-      max_tokens: 4096
-    }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j?.error?.message || `OpenRouter lỗi ${r.status}`);
-  const parsed = parseJsonLoose(chatText(j));
-  const rows = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.rows) ? parsed.rows : null);
-  if (!Array.isArray(rows)) throw new Error("OpenRouter không trả JSON bản dịch hợp lệ.");
-  return { rows, provider: "openrouter", model: j?.model || model };
-}
-
-async function inspectImageOpenRouter(bytes: Uint8Array, mime: string) {
-  const key = env("OPENROUTER_API_KEY");
-  if (!key) return null;
-  const model = env("OPENROUTER_VISION_MODEL", "openrouter/free");
-  const prompt = `Phân tích ảnh asset của theme Xiaomi/HyperOS. Chỉ quan tâm chữ hiển thị trực tiếp trong ảnh. Trả DUY NHẤT JSON object: {"has_text":boolean,"has_non_vietnamese_text":boolean,"texts":[{"src":"chữ gốc","vi":"bản dịch tiếng Việt"}]}. Không coi số giờ, phần trăm pin, logo thương hiệu hoặc ký hiệu đơn lẻ là nội dung cần dịch. Nếu chữ đã là tiếng Việt thì has_non_vietnamese_text=false.`;
-  const dataUrl = `data:${mime};base64,${bytesToBase64(bytes)}`;
-  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${key}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": env("PUBLIC_STORE_URL", "https://m4x-store.pages.dev"),
-      "X-Title": "M4X STORE AI Theme"
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: dataUrl } }
-        ]
-      }],
-      temperature: 0,
-      max_tokens: 700
-    }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j?.error?.message || `OpenRouter Vision lỗi ${r.status}`);
-  const parsed = parseJsonLoose(chatText(j));
-  if (!parsed || Array.isArray(parsed)) throw new Error("OpenRouter Vision không trả JSON hợp lệ.");
-  return {
-    has_text: !!parsed.has_text,
-    has_non_vietnamese_text: !!parsed.has_non_vietnamese_text,
-    texts: Array.isArray(parsed.texts) ? parsed.texts.slice(0, 20) : [],
-    provider: "openrouter",
-    model: j?.model || model
-  };
-}
-// ===== END M4X V22.5 =====
-
 async function translateUniqueStrings(strings: string[]) {
   const sb = adminClient();
   const targetLang = "vi";
@@ -406,22 +288,9 @@ async function translateUniqueStrings(strings: string[]) {
     const indexed = batch.map((s, i) => ({ i, s }));
     let result: any = null;
     const errors: string[] = [];
-
-    const textProviders = [
-      ["Groq", translateGroq],
-      ["Mistral", translateMistral],
-      ["OpenRouter", translateOpenRouter],
-      ["Gemini", translateGemini],
-      ["OpenAI", translateOpenAI],
-    ] as const;
-
-    for (const [name, fn] of textProviders) {
-      if (result) break;
-      try {
-        result = await fn(indexed);
-      } catch (e) {
-        errors.push(`${name}: ${e instanceof Error ? e.message : String(e)}`);
-      }
+    try { result = await translateGemini(indexed); } catch (e) { errors.push(`Gemini: ${e instanceof Error ? e.message : String(e)}`); }
+    if (!result) {
+      try { result = await translateOpenAI(indexed); } catch (e) { errors.push(`OpenAI: ${e instanceof Error ? e.message : String(e)}`); }
     }
     if (!result) throw new Error(`Không có AI dịch khả dụng. ${errors.join(" | ")}`);
 
@@ -459,7 +328,7 @@ async function getTelegramFile(fileId: string) {
   return bytes;
 }
 
-async function inspectImageGemini(bytes: Uint8Array, mime: string) {
+async function inspectImage(bytes: Uint8Array, mime: string) {
   const key = env("GEMINI_API_KEY");
   if (!key) throw new Error("Thiếu GEMINI_API_KEY để quét chữ trong ảnh.");
   const model = env("GEMINI_THEME_VISION_MODEL", "gemini-3.1-flash-lite");
@@ -482,27 +351,6 @@ async function inspectImageGemini(bytes: Uint8Array, mime: string) {
     texts: Array.isArray(parsed.texts) ? parsed.texts.slice(0, 20) : [],
   };
 }
-
-async function inspectImage(bytes: Uint8Array, mime: string) {
-  const errors: string[] = [];
-
-  try {
-    const x = await inspectImageOpenRouter(bytes, mime);
-    if (x) return x;
-  } catch (e) {
-    errors.push(`OpenRouter Vision: ${e instanceof Error ? e.message : String(e)}`);
-  }
-
-  try {
-    const x = await inspectImageGemini(bytes, mime);
-    if (x) return { ...x, provider: "gemini" };
-  } catch (e) {
-    errors.push(`Gemini Vision: ${e instanceof Error ? e.message : String(e)}`);
-  }
-
-  throw new Error(`Không có AI Vision khả dụng. ${errors.join(" | ")}`);
-}
-
 function extractInteractionImage(j: any): { bytes: Uint8Array; mime: string } | null {
   const direct = j?.output_image || j?.outputImage;
   if (direct?.data) return { bytes: base64ToBytes(String(direct.data)), mime: String(direct.mime_type || direct.mimeType || "image/png") };
