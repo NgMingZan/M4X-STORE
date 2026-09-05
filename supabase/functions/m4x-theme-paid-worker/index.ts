@@ -483,11 +483,132 @@ async function inspectImageGemini(bytes: Uint8Array, mime: string) {
   };
 }
 
+
+// ===== M4X V22.5.1 OPENROUTER VISION JSON FIX =====
+function parseVisionJsonLoose(text: string) {
+  const clean = String(text || "").trim();
+  if (!clean) return null;
+
+  const tries: string[] = [
+    clean,
+    clean.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim(),
+  ];
+
+  const fence = clean.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence?.[1]) tries.push(fence[1].trim());
+
+  const a = clean.indexOf("{");
+  const b = clean.lastIndexOf("}");
+  if (a >= 0 && b > a) tries.push(clean.slice(a, b + 1));
+
+  for (const t of tries) {
+    try {
+      const j = JSON.parse(t);
+      if (j && !Array.isArray(j) && typeof j === "object") return j;
+    } catch (_) {}
+  }
+
+  const hasText = clean.match(/has[_\s-]*text\s*[:=]\s*(true|false)/i);
+  const hasNonVi = clean.match(/has[_\s-]*non[_\s-]*vietnamese[_\s-]*text\s*[:=]\s*(true|false)/i);
+  if (hasText || hasNonVi) {
+    return {
+      has_text: hasText ? hasText[1].toLowerCase() === "true" : false,
+      has_non_vietnamese_text: hasNonVi ? hasNonVi[1].toLowerCase() === "true" : false,
+      texts: []
+    };
+  }
+  return null;
+}
+
+function isQuotaLikeError(message: string) {
+  const m = String(message || "");
+  return /(?:AI_RATE_LIMIT|\b429\b|quota exceeded|exceeded your current quota|rate.?limit|resource_exhausted|too many requests|please retry in)/i.test(m);
+}
+
+async function inspectImageOpenRouterWithRetry(bytes: Uint8Array, mime: string) {
+  const key = env("OPENROUTER_API_KEY");
+  if (!key) return null;
+
+  const configured = env("OPENROUTER_VISION_MODEL", "openrouter/free");
+  const fallback = env("OPENROUTER_VISION_FALLBACK_MODEL", "qwen/qwen2.5-vl-32b-instruct:free");
+  const models = Array.from(new Set([configured, fallback].filter(Boolean)));
+
+  const prompt = `Phân tích ảnh asset theme Xiaomi/HyperOS.
+Chỉ quan tâm chữ hiển thị trực tiếp trong ảnh.
+Trả DUY NHẤT JSON object hợp lệ, không markdown, không giải thích:
+{"has_text":boolean,"has_non_vietnamese_text":boolean,"texts":[{"src":"chữ gốc","vi":"bản dịch tiếng Việt"}]}
+Không coi số giờ, phần trăm pin, logo thương hiệu hoặc ký hiệu đơn lẻ là nội dung cần dịch.
+Nếu chữ đã là tiếng Việt thì has_non_vietnamese_text=false.`;
+
+  const dataUrl = `data:${mime};base64,${bytesToBase64(bytes)}`;
+  const errors: string[] = [];
+
+  for (const model of models) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const strictPrompt = attempt === 1 ? prompt : `${prompt}
+
+YÊU CẦU LẦN 2:
+- Chỉ xuất đúng một JSON object.
+- Ký tự đầu tiên phải là { và ký tự cuối cùng phải là }.
+- Không dùng markdown fence.`;
+
+      try {
+        const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${key}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": env("PUBLIC_STORE_URL", "https://m4x-store.pages.dev"),
+            "X-Title": "M4X STORE AI Theme"
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: strictPrompt },
+                { type: "image_url", image_url: { url: dataUrl } }
+              ]
+            }],
+            temperature: 0,
+            max_tokens: 700
+          }),
+        });
+
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j?.error?.message || `OpenRouter Vision lỗi ${r.status}`);
+
+        const raw = String(j?.choices?.[0]?.message?.content || "").trim();
+        const parsed = parseVisionJsonLoose(raw);
+        if (!parsed) {
+          errors.push(`${model}#${attempt}: JSON không hợp lệ`);
+          continue;
+        }
+
+        return {
+          has_text: !!parsed.has_text,
+          has_non_vietnamese_text: !!parsed.has_non_vietnamese_text,
+          texts: Array.isArray(parsed.texts) ? parsed.texts.slice(0, 20) : [],
+          provider: "openrouter",
+          model: j?.model || model
+        };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        errors.push(`${model}#${attempt}: ${msg}`);
+        if (isQuotaLikeError(msg)) break;
+      }
+    }
+  }
+
+  throw new Error(`OpenRouter Vision không dùng được. ${errors.join(" | ")}`);
+}
+// ===== END M4X V22.5.1 =====
+
 async function inspectImage(bytes: Uint8Array, mime: string) {
   const errors: string[] = [];
 
   try {
-    const x = await inspectImageOpenRouter(bytes, mime);
+    const x = await inspectImageOpenRouterWithRetry(bytes, mime);
     if (x) return x;
   } catch (e) {
     errors.push(`OpenRouter Vision: ${e instanceof Error ? e.message : String(e)}`);
@@ -500,7 +621,11 @@ async function inspectImage(bytes: Uint8Array, mime: string) {
     errors.push(`Gemini Vision: ${e instanceof Error ? e.message : String(e)}`);
   }
 
-  throw new Error(`Không có AI Vision khả dụng. ${errors.join(" | ")}`);
+  const message = `Không có AI Vision khả dụng. ${errors.join(" | ")}`;
+  if (errors.some(isQuotaLikeError)) {
+    throw new Error(`AI_RATE_LIMIT: ${message}`);
+  }
+  throw new Error(message);
 }
 
 function extractInteractionImage(j: any): { bytes: Uint8Array; mime: string } | null {
