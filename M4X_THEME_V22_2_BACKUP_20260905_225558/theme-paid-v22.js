@@ -5,7 +5,7 @@ const base=String(C.SUPABASE_URL||'').replace(/\/$/,'');
 const key=String(C.SUPABASE_ANON_KEY||C.SUPABASE_PUBLISHABLE_KEY||'');
 const endpoint=base?`${base}/functions/v1/m4x-theme-service`:'';
 const sb=(base&&key&&window.supabase)?window.supabase.createClient(base,key):null;
-const state={file:null,quote:null,poll:null,timer:null,user:null,profile:null,payment:null};
+const state={file:null,quote:null,poll:null,timer:null};
 const money=n=>`${Math.round(Number(n||0)).toLocaleString('vi-VN')}đ`;
 const num=n=>Number(n||0).toLocaleString('vi-VN');
 const esc=s=>String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -34,143 +34,6 @@ function setFile(file){
   state.file=file||null;$('#analyzeBtn').disabled=!state.file;$('#fileInfo').textContent=file?`${file.name} • ${(file.size/1048576).toFixed(2)} MB`:'Chưa chọn file';
 }
 
-
-async function loadWallet(total=0){
-  const balanceEl=$('#walletBalance'),stateEl=$('#walletState'),hint=$('#walletHint');
-  hide('#walletAllBtn');hide('#walletMixBtn');
-
-  if(!sb){
-    balanceEl.textContent='Không khả dụng';
-    stateEl.textContent='Lỗi';
-    return;
-  }
-
-  const {data:{user}}=await sb.auth.getUser();
-  state.user=user||null;
-
-  if(!user){
-    state.profile=null;
-    balanceEl.textContent='Chưa đăng nhập';
-    stateEl.textContent='Đăng nhập';
-    hint.innerHTML='Đăng nhập tài khoản M4X ở Cửa hàng để thanh toán bằng số dư. VietQR vẫn dùng bình thường.';
-    return;
-  }
-
-  const {data,error}=await sb.from('profiles')
-    .select('balance,is_blocked')
-    .eq('id',user.id)
-    .single();
-
-  if(error){
-    balanceEl.textContent='Không đọc được số dư';
-    stateEl.textContent='Lỗi';
-    hint.textContent=error.message;
-    return;
-  }
-
-  state.profile=data||{};
-  const bal=Number(data?.balance||0);
-  balanceEl.textContent=money(bal);
-  stateEl.textContent='Đã đăng nhập';
-
-  if(data?.is_blocked){
-    hint.textContent='Tài khoản đang bị khóa nên không thể dùng số dư.';
-    return;
-  }
-
-  if(!total){
-    hint.textContent='Số dư có thể dùng để thanh toán dịch vụ AI Lockscreen.';
-    return;
-  }
-
-  if(bal>=total){
-    $('#walletAllBtn').textContent=`💳 THANH TOÁN ${money(total)} BẰNG SỐ DƯ`;
-    show('#walletAllBtn');
-    hint.textContent=`Số dư đủ thanh toán toàn bộ ${money(total)}. Không cần chuyển khoản.`;
-  }else if(bal>0){
-    const due=Math.max(0,total-bal);
-    $('#walletMixBtn').textContent=`💳 DÙNG ${money(bal)} + 🏦 QR ${money(due)}`;
-    show('#walletMixBtn');
-    hint.textContent=`Dùng toàn bộ số dư ${money(bal)}, sau đó chỉ chuyển khoản phần thiếu ${money(due)}.`;
-  }else{
-    hint.textContent='Số dư hiện tại 0đ. Bạn có thể thanh toán toàn bộ bằng VietQR.';
-  }
-}
-
-function walletMessage(msg,type='ok'){
-  const el=$('#walletMsg');
-  el.className=`m22-note ${type}`;
-  el.textContent=msg;
-  show('#walletMsg');
-}
-
-async function walletPay(mode){
-  const o=state.quote?.order;
-  if(!o)return;
-
-  const all=$('#walletAllBtn'),mix=$('#walletMixBtn');
-  all.disabled=true;mix.disabled=true;
-
-  try{
-    const {data,error}=await sb.rpc('m4x_theme_apply_wallet',{
-      p_order_code:o.order_code,
-      p_access_token:o.access_token,
-      p_mode:mode
-    });
-    if(error)throw error;
-
-    const used=Number(data?.wallet_used||0);
-    const due=Number(data?.bank_due||0);
-    const after=Number(data?.balance_after??state.profile?.balance??0);
-
-    if(due<=0){
-      walletMessage(`✅ Đã thanh toán ${money(used)} bằng số dư M4X. Số dư còn ${money(after)}.`,'ok');
-      hide('#qrPayBox');
-      $('.m22-or')?.classList.add('hidden');
-    }else{
-      walletMessage(`✅ Đã dùng ${money(used)} số dư. Chỉ cần chuyển khoản ${money(due)} còn lại.`,'ok');
-    }
-
-    await loadWallet(Number(state.quote?.quote?.amount||0));
-    await pollOnce();
-    startPoll();
-  }catch(e){
-    walletMessage(e?.message||String(e),'err');
-  }finally{
-    all.disabled=false;mix.disabled=false;
-  }
-}
-
-function renderPaymentState(j){
-  const p=j?.payment;
-  if(!p)return;
-
-  state.payment=p;
-  const due=Number(p.bank_due||0);
-  const used=Number(p.wallet_amount||0);
-
-  if(p.wallet_refunded){
-    walletMessage(`↩️ Đơn hết hạn. Đã hoàn ${money(used)} về số dư M4X.`,'warn');
-  }else if(used>0&&due>0){
-    walletMessage(`Đã dùng ${money(used)} số dư M4X · còn ${money(due)} qua VietQR.`,'ok');
-  }else if(used>0&&due===0){
-    walletMessage(`✅ Đơn đã thanh toán hoàn toàn bằng số dư M4X.`,'ok');
-  }
-
-  if(due>0&&j.bank){
-    show('#qrPayBox');
-    $('.m22-or')?.classList.remove('hidden');
-    $('#payAmount').textContent=money(due);
-    $('#transferContent').textContent=j.bank.transfer_content||'—';
-    $('#bankAccount').textContent=j.bank.account_number||'—';
-    $('#bankNameLine').textContent=`${j.bank.bank_code||''} • ${j.bank.account_name||'M4X STORE'}`;
-    $('#qrImg').src=j.bank.qr_url||'';
-  }else if(p.mode==='wallet'||j.order?.status==='paid'){
-    hide('#qrPayBox');
-    $('.m22-or')?.classList.add('hidden');
-  }
-}
-
 async function uploadAndQuote(){
   if(!state.file||!sb)return;
   const btn=$('#analyzeBtn');btn.disabled=true;
@@ -184,22 +47,22 @@ async function uploadAndQuote(){
     const j=await api({action:'quote_uploaded',source_path:prep.upload.path,file_name:state.file.name,file_size:state.file.size,mode:'full',contact:$('#contact').value.trim()});
     state.quote=j;
     localStorage.setItem('m4x_theme_v22',JSON.stringify({order_code:j.order.order_code,access_token:j.order.access_token,expires_at:j.order.expires_at}));
-    await renderQuote(j);note('✅ Phân tích lockscreen thành công.','ok');startPoll();
+    renderQuote(j);note('✅ Phân tích lockscreen thành công.','ok');startPoll();
   }catch(e){note(e?.message||String(e),'err')}
   finally{btn.disabled=!state.file;btn.textContent='🔍 PHÂN TÍCH LOCKSCREEN & BÁO GIÁ'}
 }
 
-async function renderQuote(j){
+function renderQuote(j){
   const q=j.quote,o=j.order,b=j.bank;
   $('#qMtz').textContent=`${q.mtz_mb} MB`;$('#qSize').textContent=`${q.lockscreen_mb} MB`;$('#qImages').textContent=num(q.images);$('#qText').textContent=num(q.text_chars);
   $('#qBase').textContent=money(q.base_price);$('#qSizeFee').textContent=q.size_fee?'+'+money(q.size_fee):'0đ';$('#qImageFee').textContent=q.image_fee?'+'+money(q.image_fee):'0đ';$('#qTextFee').textContent=q.text_fee?'+'+money(q.text_fee):'0đ';$('#qTotal').textContent=money(q.amount);$('#qTotal2').textContent=money(q.amount);
-  $('#payAmount').textContent=money(o.amount);$('#transferContent').textContent=b.transfer_content;$('#bankAccount').textContent=b.account_number;$('#bankNameLine').textContent=`${b.bank_code} • ${b.account_name||'M4X STORE'}`;$('#qrImg').src=b.qr_url;await loadWallet(q.amount);
+  $('#payAmount').textContent=money(o.amount);$('#transferContent').textContent=b.transfer_content;$('#bankAccount').textContent=b.account_number;$('#bankNameLine').textContent=`${b.bank_code} • ${b.account_name||'M4X STORE'}`;$('#qrImg').src=b.qr_url;
   show('#quoteCard');show('#paymentCard');show('#statusCard');countdown(o.expires_at);window.scrollTo({top:$('#quoteCard').offsetTop-12,behavior:'smooth'});
 }
 
 function countdown(expiresAt){clearInterval(state.timer);const tick=()=>{const ms=new Date(expiresAt).getTime()-Date.now();if(ms<=0){$('#expireText').textContent='Hết hạn';clearInterval(state.timer);return}const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000);$('#expireText').textContent=`Còn ${m}:${String(s).padStart(2,'0')}`};tick();state.timer=setInterval(tick,1000)}
 function saved(){try{return JSON.parse(localStorage.getItem('m4x_theme_v22')||'null')}catch{return null}}
-async function pollOnce(){const s=saved();if(!s?.order_code||!s?.access_token)return;try{const j=await api({action:'status',order_code:s.order_code,access_token:s.access_token});show('#statusCard');renderPaymentState(j);renderStatus(j);if(j.job?.status==='done'||j.job?.status==='expired')stopPoll()}catch(e){console.warn(e)}}
+async function pollOnce(){const s=saved();if(!s?.order_code||!s?.access_token)return;try{const j=await api({action:'status',order_code:s.order_code,access_token:s.access_token});show('#statusCard');renderStatus(j);if(j.job?.status==='done'||j.job?.status==='expired')stopPoll()}catch(e){console.warn(e)}}
 function startPoll(){stopPoll();pollOnce();state.poll=setInterval(pollOnce,4000)}
 function stopPoll(){if(state.poll)clearInterval(state.poll);state.poll=null}
 function statusLabel(st){return({waiting_payment:'Chờ thanh toán',pending:'Chờ thanh toán',queued:'Đang xếp hàng',running:'AI đang xử lý',done:'Hoàn tất',failed:'Thất bại',expired:'Hết hạn',review:'Chờ kiểm tra',paid:'Đã thanh toán'})[st]||st||'Đang chờ'}
@@ -223,10 +86,10 @@ function bind(){
   ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag')}));
   ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag')}));
   drop.addEventListener('drop',e=>{const f=e.dataTransfer?.files?.[0];if(f)setFile(f)});
-  $('#analyzeBtn').addEventListener('click',uploadAndQuote);$('#walletAllBtn').addEventListener('click',()=>walletPay('wallet'));$('#walletMixBtn').addEventListener('click',()=>walletPay('mixed'));$('#retryBtn').addEventListener('click',retry);$('#newBtn').addEventListener('click',reset);
+  $('#analyzeBtn').addEventListener('click',uploadAndQuote);$('#retryBtn').addEventListener('click',retry);$('#newBtn').addEventListener('click',reset);
   document.addEventListener('click',async e=>{const b=e.target.closest('[data-copy]');if(!b)return;const el=$('#'+b.dataset.copy);try{await navigator.clipboard.writeText(el.textContent.trim());const old=b.textContent;b.textContent='Đã chép';setTimeout(()=>b.textContent=old,900)}catch{}})
 }
 
-function init(){bind();loadPricing();loadWallet(0);const s=saved();if(s?.order_code&&s?.access_token){show('#statusCard');startPoll()}}
+function init(){bind();loadPricing();const s=saved();if(s?.order_code&&s?.access_token){show('#statusCard');startPoll()}}
 init();
 })();

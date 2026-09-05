@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>M4X STORE</title>
+<meta name="theme-color" content="#05070b">
+<link rel="stylesheet" href="./assets/app.css">
+<link rel="stylesheet" href="./assets/v8.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js?v=m4x-sync-v2"></script>
+<link rel="stylesheet" href="./assets/cskh-float.css?v=m4x-cskh-v11-1">
+<link rel="stylesheet" href="./assets/product-status.css?v=m4x-detail-status-v11-2">
+<link rel="stylesheet" href="./assets/maintenance-lock.css?v=m4x-maint-v11-3">
+<link rel="stylesheet" href="./assets/luxury-ui.css?v=m4x-luxury-v16">
+<link rel="stylesheet" href="./assets/luxury-product-fix.css?v=m4x-luxury-v16-1">
+<link rel="stylesheet" href="./assets/referral.css?v=m4x-referral-v17">
+<link rel="stylesheet" href="./assets/hero-manager-v18-3.css?v=m4x-hero-v18-3">
+<link rel="stylesheet" href="./assets/telegram-miniapp-v19.css?v=1900">
+<link rel="stylesheet" href="./assets/online-update-v19.css?v=1900">
+<link rel="stylesheet" href="./assets/theme-paid-v21.css?v=2120">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">M4X <span>STORE</span></div>
+    <button id="accountQuick" class="btn ghost">Tài khoản</button>
+  </header>
+
+  <div id="updateBar" class="updatebar">
+    <div><b>Có bản M4X STORE mới</b><div id="updateText" class="muted"></div></div>
+    <button id="updateBtn" class="btn">Cập nhật</button>
+  </div>
+
+  <main id="view"></main>
+</div>
+
+<nav class="bottomnav">
+  <button class="navbtn active" data-view="store">Cửa hàng</button>
+  <button class="navbtn" data-view="library">Thư viện</button>
+  <button class="navbtn" data-view="rewards">Nhiệm vụ</button>
+  <button class="navbtn" data-view="notifications">Thông báo <span id="notifBadge"></span></button>
+  <button class="navbtn" data-view="account">Tài khoản</button>
+</nav>
+
+<div id="modal" class="modal">
+  <div class="sheet">
+    <button class="btn ghost close" onclick="M4X.closeModal()">Đóng</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script src="./assets/store.js?v=2150"></script>
+<script src="./assets/v8.js?v=2150"></script>
+<script src="./assets/cskh-float.js?v=m4x-cskh-v11-1"></script>
+<script src="./assets/product-status.js?v=m4x-detail-status-v11-2"></script>
+<script src="./assets/luxury-ui.js?v=2150"></script>
+<script src="./assets/referral.js?v=m4x-referral-v17"></script>
+<script src="./assets/maintenance-lock.js?v=m4x-maint-v11-3"></script>
+<script src="./assets/hero-manager-v18-3.js?v=m4x-hero-v18-3"></script>
+<script src="./assets/telegram-miniapp-v19.js?v=1900"></script>
+<script src="./assets/online-update-v19.js?v=1900"></script>
+</body>
+</html>

@@ -437,7 +437,6 @@ async function status(body: any, allowRetry = false) {
   const token = clip(body?.access_token, 200);
   if (!code || !token) throw new Error("Thiếu mã đơn hoặc access token.");
   const sb = adminClient();
-  try { await sb.rpc("expire_pending_orders"); } catch (_) {}
   const { data: order, error: oe } = await sb.from("orders")
     .select("id,order_code,status,amount,expires_at,paid_at")
     .eq("order_code", code).eq("access_token", token).maybeSingle();
@@ -490,17 +489,7 @@ async function status(body: any, allowRetry = false) {
       amount: Number(job.amount || order.amount), result_file_name: job.result_file_name || null,
       error: job.error || null, stats: job.stats || {},
     },
-    payment: {
-      total: Number(order.amount),
-      wallet_amount: Number(job.wallet_amount || 0),
-      bank_due: job.bank_due == null ? Number(order.amount) : Math.max(0, Number(job.bank_due)),
-      mode: job.payment_mode || "bank",
-      wallet_refunded: !!job.wallet_refunded_at,
-    },
-    bank: bankInfo(
-      job.bank_due == null ? Number(order.amount) : Math.max(0, Number(job.bank_due)),
-      order.order_code
-    ),
+    bank: bankInfo(Number(order.amount), order.order_code),
     download_url: downloadUrl,
   };
 }

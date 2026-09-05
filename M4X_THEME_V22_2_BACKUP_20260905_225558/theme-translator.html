@@ -8,7 +8,7 @@
   <script src="./config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="./assets/theme-paid-v21.css?v=2200">
-  <link rel="stylesheet" href="./assets/theme-paid-v22.css?v=2220">
+  <link rel="stylesheet" href="./assets/theme-paid-v22.css?v=2200">
 </head>
 <body class="m22-body">
   <main class="m22-shell">
@@ -102,27 +102,11 @@
 
     <section id="paymentCard" class="m22-card hidden">
       <div class="m22-section-head">
-        <div><small>BƯỚC 3</small><h2>Thanh toán</h2></div>
+        <div><small>BƯỚC 3</small><h2>Thanh toán VietQR</h2></div>
         <span id="expireText" class="m22-status-chip">—</span>
       </div>
 
-      <div id="walletBox" class="m22-wallet">
-        <div class="m22-wallet-head">
-          <div>
-            <small>SỐ DƯ M4X</small>
-            <b id="walletBalance">Đang kiểm tra…</b>
-          </div>
-          <span id="walletState">—</span>
-        </div>
-        <div id="walletHint" class="m22-wallet-hint">Đăng nhập để dùng số dư M4X.</div>
-        <button id="walletAllBtn" class="m22-primary wallet hidden" type="button">💳 THANH TOÁN 100% BẰNG SỐ DƯ</button>
-        <button id="walletMixBtn" class="m22-primary mix hidden" type="button">💳 + 🏦 DÙNG SỐ DƯ & TRẢ PHẦN THIẾU</button>
-        <div id="walletMsg" class="m22-note hidden"></div>
-      </div>
-
-      <div class="m22-or"><span>hoặc thanh toán bằng VietQR</span></div>
-
-      <div id="qrPayBox" class="m22-pay">
+      <div class="m22-pay">
         <img id="qrImg" class="m22-qr" alt="VietQR">
         <div class="m22-pay-info">
           <span>Số tiền</span><b id="payAmount" class="m22-pay-amount">—</b>
@@ -161,6 +145,6 @@
     <footer class="m22-foot">M4X STORE • Chỉ thay component lockscreen • các component khác trong MTZ được giữ nguyên.</footer>
   </main>
 
-  <script src="./assets/theme-paid-v22.js?v=2220"></script>
+  <script src="./assets/theme-paid-v22.js?v=2200"></script>
 </body>
 </html>

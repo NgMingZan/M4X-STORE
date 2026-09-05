@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07111d">
+  <title>AI Việt hóa Lockscreen — M4X STORE</title>
+  <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+  <script src="./config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="./assets/theme-paid-v21.css?v=2162">
+  <link rel="stylesheet" href="./assets/theme-paid-v21-6.css?v=2162">
+</head>
+<body class="v21-page">
+  <main class="v21-shell">
+    <header class="v21-top">
+      <div class="v21-brand"><span>M4X</span> STORE</div>
+      <a class="v21-back" href="./index.html">← Cửa hàng</a>
+    </header>
+
+    <section class="v21-hero">
+      <div class="v21-badge">🌐 AI DỊCH LOCKSCREEN · V21.6</div>
+      <h1>Việt hóa Lockscreen như trên Telegram</h1>
+      <p>Chọn chế độ → gửi file MTZ → phân tích lockscreen → báo giá → VietQR → AI xử lý → tải MTZ đã Việt hóa.</p>
+    </section>
+
+    <section class="v21-card">
+      <h2>1. Chọn chế độ Việt hóa</h2>
+      <div class="v216-modes">
+        <button type="button" class="v216-mode" data-mode="text">
+          <b>⚡ Chỉ văn bản</b>
+          <span>Dịch XML/config trong lockscreen. Không quét, không sửa ảnh.</span>
+        </button>
+        <button type="button" class="v216-mode" data-mode="scan">
+          <b>🔎 Văn bản + quét chữ ảnh</b>
+          <span>Dịch text và AI kiểm tra ảnh nào có chữ cần Việt hóa. Ảnh giữ nguyên.</span>
+        </button>
+        <button type="button" class="v216-mode active" data-mode="full">
+          <b>🖼 FULL: Văn bản + sửa ảnh</b>
+          <span>Dịch XML/config và Việt hóa chữ trực tiếp trên ảnh lockscreen.</span>
+          <em>Khuyên dùng</em>
+        </button>
+      </div>
+      <div id="modeNote" class="v21-note ok">Đã chọn: 🖼 FULL — văn bản + sửa ảnh.</div>
+    </section>
+
+    <div class="v21-grid" style="margin-top:16px">
+      <section class="v21-card">
+        <h2>2. Gửi file MTZ</h2>
+        <label class="v21-drop" id="dropZone">
+          <input id="themeFile" type="file" accept=".mtz,application/octet-stream,application/zip" hidden>
+          <div style="font-size:36px">📦</div>
+          <strong>Chạm để chọn file .mtz</strong>
+          <div class="v21-muted">Chỉ xử lý component lockscreen</div>
+          <div id="fileInfo" class="v21-file">Chưa chọn file</div>
+        </label>
+        <input id="contact" class="v21-input" maxlength="160" placeholder="Telegram / Zalo / Email (tùy chọn)">
+        <button id="analyzeBtn" class="v21-btn" disabled>🔍 Gửi MTZ & báo giá</button>
+        <div id="analyzeMsg" class="v21-note v21-hidden"></div>
+      </section>
+
+      <aside class="v21-card">
+        <h3>💰 Bảng giá công khai</h3>
+        <div class="v21-muted">Giá tối thiểu <b>10.000đ</b>. Phí ảnh chỉ cộng khi chọn FULL sửa ảnh.</div>
+        <div id="pricingBox" style="margin-top:10px"><div class="v21-muted">Đang tải bảng giá...</div></div>
+      </aside>
+    </div>
+
+    <section id="quoteCard" class="v21-card v21-hidden" style="margin-top:16px">
+      <h2>3. Báo giá tự động</h2>
+      <div class="v216-mode-summary"><span>Chế độ</span><b id="qMode">—</b></div>
+      <div class="v21-kpis">
+        <div class="v21-kpi"><b id="qSize">—</b><small>Lockscreen</small></div>
+        <div class="v21-kpi"><b id="qImages">—</b><small>Ảnh</small></div>
+        <div class="v21-kpi"><b id="qText">—</b><small>Ký tự cần dịch</small></div>
+      </div>
+      <div class="v21-breakdown">
+        <div class="v21-row"><span>Phí cơ bản</span><b id="qBase">—</b></div>
+        <div class="v21-row"><span>Dung lượng lockscreen</span><b id="qSizeFee">—</b></div>
+        <div class="v21-row"><span>Việt hóa ảnh</span><b id="qImageFee">—</b></div>
+        <div class="v21-row"><span>Văn bản XML/config</span><b id="qTextFee">—</b></div>
+        <div class="v21-row total"><span>Tổng thanh toán</span><b id="qTotal">—</b></div>
+      </div>
+    </section>
+
+    <section id="paymentCard" class="v21-card v21-hidden" style="margin-top:16px">
+      <h2>4. Thanh toán VietQR</h2>
+      <div class="v21-pay">
+        <img id="qrImg" class="v21-qr" alt="VietQR">
+        <div>
+          <div class="v21-muted">Số tiền</div>
+          <div id="payAmount" class="v21-price">—</div>
+          <div class="v21-muted">Nội dung chuyển khoản</div>
+          <div><span id="transferContent" class="v21-code">—</span><button class="v21-copy" data-copy="transferContent">Sao chép</button></div>
+          <div style="margin-top:12px" class="v21-muted">Ngân hàng / Số tài khoản</div>
+          <div><b id="bankCode">—</b> · <span id="bankAccount" class="v21-code" style="font-size:15px">—</span><button class="v21-copy" data-copy="bankAccount">Sao chép</button></div>
+          <div id="bankName" class="v21-muted" style="margin-top:5px"></div>
+          <div id="expireText" class="v21-note warn">Đang tính thời gian...</div>
+        </div>
+      </div>
+      <div class="v21-note warn">Chuyển đúng số tiền và đúng nội dung. SePay sẽ tự xác nhận.</div>
+    </section>
+
+    <section id="statusCard" class="v21-card v21-hidden" style="margin-top:16px">
+      <h2>5. Tiến độ Việt hóa</h2>
+      <div class="v21-status">
+        <span id="statusDot" class="v21-dot"></span>
+        <div style="flex:1">
+          <b id="statusTitle">Đang chờ...</b>
+          <div id="statusMode" class="v216-status-mode"></div>
+          <div id="statusStage" class="v21-muted">—</div>
+          <div class="v21-progress"><i id="progressBar"></i></div>
+        </div>
+      </div>
+      <div id="statusStats" class="v216-stats v21-hidden"></div>
+      <div id="statusNote" class="v21-note v21-hidden"></div>
+      <a id="downloadBtn" class="v21-btn green v21-hidden" href="#" rel="noopener">📥 TẢI MTZ ĐÃ VIỆT HÓA</a>
+      <button id="retryBtn" class="v21-btn secondary v21-hidden">🔄 Thử dịch lại</button>
+      <button id="newBtn" class="v21-btn secondary">＋ Dịch theme khác</button>
+    </section>
+
+    <div class="v21-foot">M4X STORE · Chỉ xử lý lockscreen · các component khác giữ nguyên.</div>
+  </main>
+  <script src="./assets/theme-paid-v21-page.js?v=2170"></script>
+</body>
+</html>

@@ -16,15 +16,3 @@ button,input{font:inherit}.hidden{display:none!important}.m22-shell{width:min(98
 .m22-progress{height:10px;border-radius:99px;background:rgba(255,255,255,.05);overflow:hidden}.m22-progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,#328bff,#5ce2ab);transition:.35s}.m22-stage{color:#a4b8c8;font-size:13px;margin:10px 0 14px}.m22-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .m22-note{margin-top:12px;border-radius:13px;padding:11px 12px;font-size:12px;line-height:1.5;border:1px solid rgba(255,210,119,.13);background:rgba(255,210,119,.06);color:#e7c886}.m22-note.ok{border-color:rgba(105,229,167,.13);background:rgba(105,229,167,.06);color:#8be9b8}.m22-note.err{border-color:rgba(255,125,139,.16);background:rgba(255,125,139,.07);color:#ff9fa9}.m22-foot{text-align:center;color:#5e778c;font-size:11px;padding:18px 0}.m22-skeleton{color:#7890a4;font-size:12px}
 @media(max-width:760px){.m22-grid{grid-template-columns:1fr}.m22-pay{grid-template-columns:1fr}.m22-qr{width:min(240px,100%);margin:auto}.m22-kpis{grid-template-columns:repeat(2,1fr)}.m22-stats{grid-template-columns:repeat(2,1fr)}.m22-hero h1{font-size:38px}}
-
-
-.m22-wallet{border:1px solid rgba(85,168,255,.15);background:rgba(85,168,255,.045);border-radius:17px;padding:14px;margin-bottom:14px}
-.m22-wallet-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.m22-wallet-head small{display:block;color:#718ba1;font-size:10px;font-weight:900;letter-spacing:1px}
-.m22-wallet-head b{display:block;font-size:22px;color:#eaf6ff;margin-top:3px}
-.m22-wallet-head>span{font-size:11px;color:#8fc5ff;border:1px solid rgba(85,168,255,.18);padding:6px 8px;border-radius:99px}
-.m22-wallet-hint{color:#9db2c3;font-size:12px;line-height:1.55;margin-top:10px}
-.m22-primary.wallet{background:linear-gradient(135deg,#1db77a,#3bd59d)}
-.m22-primary.mix{background:linear-gradient(135deg,#2b8cff,#765cff)}
-.m22-or{display:flex;align-items:center;gap:10px;color:#607a90;font-size:10px;font-weight:850;letter-spacing:.6px;margin:12px 0}
-.m22-or:before,.m22-or:after{content:"";height:1px;background:rgba(255,255,255,.07);flex:1}
