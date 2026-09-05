@@ -1,5 +1,5 @@
-// M4X STORE V20.1 — AI THEME TRANSLATOR (LOCKSCREEN ONLY)
-// Only translates the nested Xiaomi/HyperOS `lockscreen` component inside .mtz.
+// M4X STORE V20 — AI THEME TRANSLATOR
+// Heavy worker for Xiaomi/HyperOS .mtz translation.
 // Modes: text | scan | full
 import { createClient } from "npm:@supabase/supabase-js@2";
 import JSZip from "npm:jszip@3.10.1";
@@ -421,44 +421,20 @@ async function processThemeJob(payload: any) {
   };
   try {
     await updateJob(jobId, { status: "running", started_at: new Date().toISOString(), stats });
-    await tg("sendMessage", { chat_id: chatId, text: `🔒 AI DỊCH LOCKSCREEN — V20.1\n\n⏳ Đang tải MTZ và mở component lockscreen:\n${fileName}\n\nChế độ: ${mode === "text" ? "⚡ Văn bản" : mode === "scan" ? "🔎 Văn bản + quét ảnh" : "🖼 Full văn bản + ảnh"}` });
+    await tg("sendMessage", { chat_id: chatId, text: `🌐 AI DỊCH THEME — V20\n\n⏳ Đang tải và giải nén:\n${fileName}\n\nChế độ: ${mode === "text" ? "⚡ Văn bản" : mode === "scan" ? "🔎 Văn bản + quét ảnh" : "🖼 Full văn bản + ảnh"}` });
 
     const input = await getTelegramFile(fileId);
     const maxMb = Math.max(3, Number(env("M4X_THEME_MAX_MB", "18")) || 18);
     if (input.length > maxMb * 1024 * 1024) throw new Error(`MTZ ${(input.length / 1024 / 1024).toFixed(1)}MB vượt giới hạn ${maxMb}MB của V20.`);
 
-    // Xiaomi MTZ stores the lock screen as a nested ZIP component usually named exactly `lockscreen`.
-    // V20 scanned only the outer MTZ, which is why many themes showed 0 strings.
-    let outerZip: JSZip;
-    try { outerZip = await JSZip.loadAsync(input); } catch (_) { throw new Error("File không phải MTZ/ZIP hợp lệ hoặc archive bị lỗi."); }
-    const outerEntries = Object.values(outerZip.files).filter((f: any) => !f.dir) as any[];
-    stats.outer_files = outerEntries.length;
-
-    const lockscreenEntry = outerEntries.find((e: any) => /(?:^|\/)lockscreen(?:\.zip)?$/i.test(String(e.name)))
-      || outerEntries.find((e: any) => /(?:^|\/)lockscreen[^/]*$/i.test(String(e.name)));
-    if (!lockscreenEntry) {
-      throw new Error("Không tìm thấy component `lockscreen` bên trong MTZ. Theme này có thể dùng cấu trúc khác.");
-    }
-    stats.lockscreen_entry = String(lockscreenEntry.name);
-
-    let lockscreenBytes: Uint8Array;
-    try { lockscreenBytes = await lockscreenEntry.async("uint8array"); } catch (_) { throw new Error("Không đọc được component lockscreen trong MTZ."); }
-
     let zip: JSZip;
-    try { zip = await JSZip.loadAsync(lockscreenBytes); } catch (_) {
-      throw new Error("Đã thấy file lockscreen nhưng nó không phải archive ZIP hợp lệ. Không sửa để tránh làm hỏng theme.");
-    }
-
+    try { zip = await JSZip.loadAsync(input); } catch (_) { throw new Error("File không phải MTZ/ZIP hợp lệ hoặc archive bị lỗi."); }
     const entries = Object.values(zip.files).filter((f: any) => !f.dir) as any[];
     stats.files = entries.length;
     const maxFiles = Math.max(200, Number(env("M4X_THEME_MAX_FILES", "5000")) || 5000);
-    if (entries.length > maxFiles) throw new Error(`Lockscreen có ${entries.length} file, vượt giới hạn an toàn ${maxFiles}.`);
+    if (entries.length > maxFiles) throw new Error(`Theme có ${entries.length} file, vượt giới hạn an toàn ${maxFiles}.`);
 
-    const textEntries = entries.filter((e: any) => {
-      const n = String(e.name || "");
-      return /\.(?:xml|properties|ini|conf|cfg|txt)$/i.test(n)
-        || /(?:^|\/)(?:manifest|config|settings?|strings?)(?:\.[^/]*)?$/i.test(n);
-    });
+    const textEntries = entries.filter((e: any) => /\.(?:xml|properties|ini|conf|cfg|txt)$/i.test(e.name));
     stats.text_files = textEntries.length;
     const originals = new Map<string, string>();
     const unique = new Set<string>();
@@ -540,26 +516,22 @@ async function processThemeJob(payload: any) {
     }
 
     const report = {
-      app: "M4X AI THEME TRANSLATOR V20.1 — LOCKSCREEN ONLY",
+      app: "M4X AI THEME TRANSLATOR V20",
       source: fileName,
       mode,
       created_at: new Date().toISOString(),
       stats,
-      note: "V20.1 chỉ mở và Việt hóa component lockscreen; các component khác của MTZ được giữ nguyên. ID, biến, path và expression được giữ nguyên theo bộ lọc an toàn.",
+      note: "Chỉ sửa chuỗi giao diện mục tiêu; ID, biến, path và expression được giữ nguyên theo bộ lọc an toàn.",
     };
+    zip.file("M4X_TRANSLATION_REPORT.json", JSON.stringify(report, null, 2));
 
-    // Rebuild ONLY the nested lockscreen component, then put it back into the original MTZ.
-    const rebuiltLockscreen = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } });
-    outerZip.file(String(lockscreenEntry.name), rebuiltLockscreen);
-    outerZip.file("M4X_TRANSLATION_REPORT.json", JSON.stringify(report, null, 2));
-
-    await tg("sendMessage", { chat_id: chatId, text: "📦 Đang đóng gói lại lockscreen vào MTZ..." });
-    const output = await outerZip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    await tg("sendMessage", { chat_id: chatId, text: "📦 Đang đóng gói lại MTZ..." });
+    const output = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } });
     const outName = outputName(fileName);
     const form = new FormData();
     form.append("chat_id", chatId);
     form.append("document", new Blob([output], { type: "application/octet-stream" }), outName);
-    const summary = `✅ VIỆT HÓA LOCKSCREEN HOÀN TẤT\n\n🔒 ${stats.lockscreen_entry || "lockscreen"} · ${stats.files} file bên trong\n📄 ${stats.text_files} file text · ${stats.unique_strings} chuỗi\n✍️ ${stats.replacements} vị trí đã thay\n♻️ Cache: ${stats.cache_hits} · AI mới: ${stats.ai_translated}\n🖼 Quét: ${stats.images_scanned} · Có chữ cần dịch: ${stats.images_with_text} · Đã sửa: ${stats.images_edited}\n${stats.warnings.length ? `⚠️ ${stats.warnings.length} cảnh báo — xem M4X_TRANSLATION_REPORT.json trong MTZ` : "✅ Không có cảnh báo lớn"}`;
+    const summary = `✅ VIỆT HÓA THEME HOÀN TẤT\n\n📄 ${stats.text_files} file text · ${stats.unique_strings} chuỗi\n✍️ ${stats.replacements} vị trí đã thay\n♻️ Cache: ${stats.cache_hits} · AI mới: ${stats.ai_translated}\n🖼 Quét: ${stats.images_scanned} · Có chữ cần dịch: ${stats.images_with_text} · Đã sửa: ${stats.images_edited}\n${stats.warnings.length ? `⚠️ ${stats.warnings.length} cảnh báo — xem M4X_TRANSLATION_REPORT.json trong MTZ` : "✅ Không có cảnh báo lớn"}`;
     form.append("caption", clip(summary, 950));
     await telegramMultipart("sendDocument", form);
     await updateJob(jobId, {
