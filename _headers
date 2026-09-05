@@ -17,3 +17,11 @@
 /assets/admin-telegram-channel-v19-3.css
   Cache-Control: no-cache, must-revalidate
 # M4X_ADMIN_TG_V19_3_END
+# M4X_AI_BOT_V19_4_START
+/admin.html
+  Cache-Control: no-cache, must-revalidate
+/assets/admin-ai-caption-v19-4.js
+  Cache-Control: no-cache, must-revalidate
+/assets/admin-ai-caption-v19-4.css
+  Cache-Control: no-cache, must-revalidate
+# M4X_AI_BOT_V19_4_END
