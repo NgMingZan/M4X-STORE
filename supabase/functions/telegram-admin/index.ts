@@ -54,7 +54,10 @@ Deno.serve(async (req) => {
         daily_time_1:hm(p.daily_time_1,"08:00"),daily_time_2:hm(p.daily_time_2,"20:00"),
         new_product_enabled:p.new_product_enabled!==false,hero_enabled:p.hero_enabled!==false,
         online_update_enabled:p.online_update_enabled!==false,repost_enabled:!!p.repost_enabled,
-        repost_days:Math.max(1,Math.min(30,Math.floor(Number(p.repost_days||3)))),updated_at:new Date().toISOString()
+        repost_days:Math.max(1,Math.min(30,Math.floor(Number(p.repost_days||3)))),
+        stock_enabled:p.stock_enabled!==false,stock_alert_enabled:p.stock_alert_enabled!==false,
+        stock_low_threshold:Math.max(1,Math.min(99,Math.floor(Number(p.stock_low_threshold||5)))),
+        updated_at:new Date().toISOString()
       };
       const {data,error}=await sb.from("telegram_channel_settings").upsert(row,{onConflict:"id"}).select("*").single(); if(error)throw error;
       await audit(user.id,"save_channel_automation",row);
@@ -69,6 +72,15 @@ Deno.serve(async (req) => {
         sb.from("telegram_channel_posts").select("event_type,posted_at,telegram_message_id").order("posted_at",{ascending:false}).limit(1).maybeSingle()
       ]);
       return json({ok:true,config:cfg,pending:pending||0,failed:failed||0,last_post:lastPost||null});
+    }
+
+    if(action==="refresh_stock_message"){
+      const {error}=await sb.from("telegram_channel_queue").insert({
+        event_type:"stock_sync",dedupe_key:`stock-manual:${crypto.randomUUID()}`,payload:{source:"telegram-admin",admin_user_id:String(user.id)},status:"pending",available_at:new Date().toISOString()
+      });
+      if(error)throw error;
+      await audit(user.id,"refresh_stock_message");
+      return json({ok:true,message:"Đã đưa yêu cầu cập nhật tồn kho vào Queue. Worker sẽ xử lý trong khoảng 1 phút."});
     }
 
     if(action==="bot_status"){
