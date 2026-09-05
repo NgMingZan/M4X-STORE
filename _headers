@@ -34,6 +34,8 @@
 # M4X_THEME_PAID_V21_START
 /theme-translator.html
   Cache-Control: no-cache, must-revalidate
+/assets/theme-paid-v21.css
+  Cache-Control: no-cache, must-revalidate
 /assets/theme-paid-v21-page.js
   Cache-Control: no-cache, must-revalidate
 /assets/theme-paid-entry-v21.js

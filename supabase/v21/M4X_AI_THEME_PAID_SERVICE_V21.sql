@@ -8,7 +8,11 @@ begin;
 
 create extension if not exists pgcrypto;
 
--- Sản phẩm hệ thống ẩn. V21 tạo order với số tiền động sau khi phân tích MTZ.
+-- V21.1: sản phẩm dịch AI hiển thị công khai và luôn có cờ pinned.
+alter table public.products add column if not exists pinned boolean not null default false;
+create index if not exists idx_products_pinned_created on public.products(pinned desc, created_at desc);
+
+-- Sản phẩm dịch vụ. Giá 10.000đ là giá khởi điểm; đơn thực tế dùng báo giá động.
 insert into public.products(
   id, category_id, name, slug, description, price, delivery_type,
   stock_mode, sold_count, reserved_count, active
@@ -18,20 +22,38 @@ values(
   null,
   'AI Việt hóa Lockscreen',
   'm4x-ai-viet-hoa-lockscreen-v21',
-  'Sản phẩm hệ thống dùng để nhận thanh toán dịch lockscreen theo báo giá tự động.',
-  0,
+  'AI Việt hóa lockscreen: dịch text + chữ trong ảnh. Giá từ 10.000đ và tự tính theo độ nặng, số ảnh, lượng văn bản.',
+  10000,
   'service',
   'unlimited',
   0,
   0,
-  false
+  true
 )
 on conflict (id) do update set
   name = excluded.name,
   description = excluded.description,
+  price = 10000,
   delivery_type = 'service',
   stock_mode = 'unlimited',
-  active = false;
+  active = true;
+
+update public.products
+set pinned = true, active = true, price = 10000
+where id = '00000000-0000-4000-8000-000000002100'::uuid;
+
+-- Nếu Store đã có danh mục AI thì tự gắn sản phẩm vào danh mục đó.
+update public.products p
+set category_id = c.id
+from lateral (
+  select id from public.categories
+  where lower(coalesce(slug,'')) in ('ai','ai-tien-ich','ai-tienich')
+     or lower(coalesce(name,'')) = 'ai'
+  order by sort_order nulls last, id
+  limit 1
+) c
+where p.id = '00000000-0000-4000-8000-000000002100'::uuid
+  and p.category_id is null;
 
 -- Bảng giá công khai. Admin có thể sửa JSON mà không cần deploy lại code.
 create table if not exists public.m4x_theme_paid_pricing (
