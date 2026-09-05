@@ -37,3 +37,9 @@ jobs:
           supabase functions deploy m4x-theme-translator \
             --project-ref "$PROJECT_REF" \
             --no-verify-jwt
+
+      - name: Deploy create-download-link
+        run: |
+          supabase functions deploy create-download-link \
+            --project-ref "$PROJECT_REF" \
+            --no-verify-jwt
