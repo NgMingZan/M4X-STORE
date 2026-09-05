@@ -420,183 +420,319 @@ async function ownerNotify(text: string) {
   try { await tg("sendMessage", { chat_id: owner, text: clip(text, 3500) }); } catch (_) {}
 }
 
+
+async function continuePaidJob(jobId: string) {
+  const base = env("SUPABASE_URL").replace(/\/$/, "");
+  const key = secretKey();
+  if (!base || !key) throw new Error("Thiếu cấu hình tự chạy tiếp worker.");
+  const task = fetch(`${base}/functions/v1/m4x-theme-paid-worker`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ job_id: jobId }),
+  }).catch(e => console.error("V22 continue worker failed", e));
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(task); else await task;
+}
+
+async function queuePaidJob(jobId: string, patch: Record<string, unknown>) {
+  await updatePaidJob(jobId, { ...patch, status: "queued" });
+  await continuePaidJob(jobId);
+}
+
+async function inspectImageBatch(items: Array<{ index: number; bytes: Uint8Array; mime: string }>) {
+  if (!items.length) return [];
+  const key = env("GEMINI_API_KEY");
+  if (!key) throw new Error("Thiếu GEMINI_API_KEY để quét chữ trong ảnh.");
+  const model = env("GEMINI_THEME_VISION_MODEL", "gemini-3.1-flash-lite");
+  const prompt = `Kiểm tra nhiều ảnh chỉ thuộc LOCKSCREEN của theme Xiaomi/HyperOS.
+Mỗi ảnh có IMAGE_INDEX riêng.
+Chỉ phát hiện chữ hiển thị trực tiếp.
+Bỏ qua số giờ, phần trăm pin, logo thương hiệu và ký hiệu đơn lẻ.
+Nếu ảnh không có chữ hoặc chữ đã là tiếng Việt thì has_non_vietnamese_text=false.
+Trả DUY NHẤT JSON array:
+{"index":number,"has_text":boolean,"has_non_vietnamese_text":boolean,"texts":[{"src":"chữ gốc","vi":"bản dịch tiếng Việt"}]}.
+Phải trả đủ INDEX đã gửi.`;
+
+  const parts: any[] = [{ text: prompt }];
+  for (const item of items) {
+    parts.push({ text: `IMAGE_INDEX=${item.index}` });
+    parts.push({ inlineData: { mimeType: item.mime, data: bytesToBase64(item.bytes) } });
+  }
+
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts }],
+      generationConfig: { temperature: 0, maxOutputTokens: 3000, responseMimeType: "application/json" },
+    }),
+  });
+
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.error?.message || `Gemini Vision batch lỗi ${r.status}`);
+  const parsed = parseJsonLoose(geminiText(j));
+  if (!Array.isArray(parsed)) throw new Error("Gemini batch không trả JSON array.");
+
+  const byIndex = new Map<number, any>();
+  for (const x of parsed) {
+    const idx = Number(x?.index);
+    if (!Number.isFinite(idx)) continue;
+    byIndex.set(idx, {
+      has_text: !!x?.has_text,
+      has_non_vietnamese_text: !!x?.has_non_vietnamese_text,
+      texts: Array.isArray(x?.texts) ? x.texts.slice(0, 20) : [],
+    });
+  }
+
+  return items.map(item => ({
+    index: item.index,
+    scan: byIndex.get(item.index) || { has_text: false, has_non_vietnamese_text: false, texts: [] },
+  }));
+}
+
 async function processPaidJob(jobId: string) {
   const sb = adminClient();
   const { data: job, error: loadError } = await sb.from("m4x_theme_paid_jobs").select("*").eq("id", jobId).maybeSingle();
   if (loadError) throw loadError;
-  if (!job) throw new Error("Không tìm thấy job V21.");
+  if (!job) throw new Error("Không tìm thấy job V22.");
+
   const rawMode = String(job.mode || "full").toLowerCase();
   const mode = ["text", "scan", "full"].includes(rawMode) ? rawMode : "full";
-
+  const oldStats = (job.stats && typeof job.stats === "object") ? job.stats : {};
   const stats: any = {
-    mode, files: 0, text_files: 0, unique_strings: 0, replacements: 0,
-    cache_hits: 0, ai_translated: 0, images_scanned: 0, images_with_text: 0,
-    images_edited: 0, images_skipped: 0, warnings: [], image_texts: [],
+    mode,
+    phase: oldStats.phase || "init",
+    files: Number(oldStats.files || 0),
+    text_files: Number(oldStats.text_files || 0),
+    unique_strings: Number(oldStats.unique_strings || 0),
+    replacements: Number(oldStats.replacements || 0),
+    cache_hits: Number(oldStats.cache_hits || 0),
+    ai_translated: Number(oldStats.ai_translated || 0),
+    images_scanned: Number(oldStats.images_scanned || 0),
+    images_with_text: Number(oldStats.images_with_text || 0),
+    images_edited: Number(oldStats.images_edited || 0),
+    images_skipped: Number(oldStats.images_skipped || 0),
+    image_names: Array.isArray(oldStats.image_names) ? oldStats.image_names : [],
+    foreign_images: Array.isArray(oldStats.foreign_images) ? oldStats.foreign_images : [],
+    scan_cursor: Number(oldStats.scan_cursor || 0),
+    edit_cursor: Number(oldStats.edit_cursor || 0),
+    warnings: Array.isArray(oldStats.warnings) ? oldStats.warnings : [],
   };
+  const workPath = `work/${job.id}/lockscreen.zip`;
+
   try {
-    await updatePaidJob(jobId, { progress: 5, stage: "Đang tải file MTZ", stats });
-    const dl = await sb.storage.from("theme-translation-private").download(String(job.source_path));
-    if (dl.error || !dl.data) throw new Error(`Không tải được file nguồn: ${dl.error?.message || "unknown"}`);
-    const input = new Uint8Array(await dl.data.arrayBuffer());
-    if ((await sha256FileBytes(input)) !== String(job.source_sha256)) throw new Error("Hash file nguồn không khớp báo giá. Dừng để tránh xử lý nhầm file.");
+    if (stats.phase === "init") {
+      await updatePaidJob(jobId,{progress:5,stage:"Đang mở MTZ và component lockscreen",stats});
+      const dl=await sb.storage.from("theme-translation-private").download(String(job.source_path));
+      if(dl.error||!dl.data)throw new Error(`Không tải được file nguồn: ${dl.error?.message||"unknown"}`);
+      const input=new Uint8Array(await dl.data.arrayBuffer());
+      if((await sha256FileBytes(input))!==String(job.source_sha256))throw new Error("Hash file nguồn không khớp báo giá.");
 
-    await updatePaidJob(jobId, { progress: 10, stage: "Đang mở component lockscreen" });
-    let outerZip: JSZip;
-    try { outerZip = await JSZip.loadAsync(input); } catch (_) { throw new Error("MTZ/ZIP nguồn bị lỗi."); }
-    const outerEntries = Object.values(outerZip.files).filter((f: any) => !f.dir) as any[];
-    const lockscreenEntry = outerEntries.find((e: any) => String(e.name) === String(job.lockscreen_entry))
-      || outerEntries.find((e: any) => /(?:^|\/)lockscreen(?:\.zip)?$/i.test(String(e.name)))
-      || outerEntries.find((e: any) => /(?:^|\/)lockscreen[^/]*$/i.test(String(e.name)));
-    if (!lockscreenEntry) throw new Error("Không còn tìm thấy component lockscreen đã báo giá.");
-    const lockscreenBytes = await lockscreenEntry.async("uint8array");
-    const maxMb = Math.max(1, Number(env("M4X_THEME_MAX_MB", "18")) || 18);
-    if (lockscreenBytes.length > maxMb * 1024 * 1024) throw new Error(`Lockscreen vượt ${maxMb}MB.`);
+      let outerZip:JSZip;
+      try{outerZip=await JSZip.loadAsync(input)}catch(_){throw new Error("MTZ/ZIP nguồn bị lỗi.")}
+      const outerEntries=Object.values(outerZip.files).filter((f:any)=>!f.dir) as any[];
+      const lockscreenEntry=outerEntries.find((e:any)=>String(e.name)===String(job.lockscreen_entry))
+        ||outerEntries.find((e:any)=>/(?:^|\/)lockscreen(?:\.zip)?$/i.test(String(e.name)))
+        ||outerEntries.find((e:any)=>/(?:^|\/)lockscreen[^/]*$/i.test(String(e.name)));
+      if(!lockscreenEntry)throw new Error("Không tìm thấy component lockscreen.");
 
-    let zip: JSZip;
-    try { zip = await JSZip.loadAsync(lockscreenBytes); } catch (_) { throw new Error("Component lockscreen không phải ZIP hợp lệ."); }
-    const entries = Object.values(zip.files).filter((f: any) => !f.dir) as any[];
-    stats.files = entries.length;
+      const lockscreenBytes=await lockscreenEntry.async("uint8array");
+      const maxMb=Math.max(1,Number(env("M4X_THEME_MAX_MB","60"))||60);
+      if(lockscreenBytes.length>maxMb*1024*1024)throw new Error(`Lockscreen vượt ${maxMb}MB.`);
 
-    await updatePaidJob(jobId, { progress: 18, stage: "Đang quét văn bản trong lockscreen", stats });
-    const textEntries = entries.filter((e: any) => {
-      const n = String(e.name || "");
-      return /\.(?:xml|properties|ini|conf|cfg|txt)$/i.test(n)
-        || /(?:^|\/)(?:manifest|config|settings?|strings?)(?:\.[^/]*)?$/i.test(n);
-    });
-    stats.text_files = textEntries.length;
-    const originals = new Map<string, string>();
-    const unique = new Set<string>();
-    for (const e of textEntries) {
-      let content = "";
-      try { content = await e.async("string"); } catch (_) { continue; }
-      originals.set(e.name, content);
-      if (/\.xml$/i.test(e.name)) collectStringsFromXml(content, unique);
-      else collectStringsFromProperties(content, unique);
-    }
-    stats.unique_strings = unique.size;
+      let zip:JSZip;
+      try{zip=await JSZip.loadAsync(lockscreenBytes)}catch(_){throw new Error("Component lockscreen không phải ZIP hợp lệ.")}
+      const entries=Object.values(zip.files).filter((f:any)=>!f.dir) as any[];
+      stats.files=entries.length;
 
-    await updatePaidJob(jobId, { progress: 28, stage: `Đang AI dịch ${stats.unique_strings} chuỗi`, stats });
-    const translated = await translateUniqueStrings(Array.from(unique));
-    stats.cache_hits = translated.cacheHits;
-    stats.ai_translated = translated.aiTranslated;
-    for (const e of textEntries) {
-      const content = originals.get(e.name);
-      if (content == null) continue;
-      const result = /\.xml$/i.test(e.name) ? applyXmlTranslations(content, translated.map) : applyPropertyTranslations(content, translated.map);
-      if (result.changed) {
-        zip.file(e.name, result.content);
-        stats.replacements += result.changed;
+      await updatePaidJob(jobId,{progress:12,stage:"Đang tìm văn bản XML/config trong lockscreen",stats});
+      const textEntries=entries.filter((e:any)=>{
+        const n=String(e.name||"");
+        return /\.(?:xml|properties|ini|conf|cfg|txt)$/i.test(n)
+          ||/(?:^|\/)(?:manifest|config|settings?|strings?)(?:\.[^/]*)?$/i.test(n);
+      });
+      stats.text_files=textEntries.length;
+
+      const originals=new Map<string,string>();
+      const unique=new Set<string>();
+      for(const e of textEntries){
+        let content="";
+        try{content=await e.async("string")}catch(_){continue}
+        originals.set(e.name,content);
+        if(/\.xml$/i.test(e.name))collectStringsFromXml(content,unique);
+        else collectStringsFromProperties(content,unique);
       }
+      stats.unique_strings=unique.size;
+
+      await updatePaidJob(jobId,{progress:20,stage:`Đang AI dịch ${stats.unique_strings} chuỗi văn bản`,stats});
+      const translated=await translateUniqueStrings(Array.from(unique));
+      stats.cache_hits=translated.cacheHits;
+      stats.ai_translated=translated.aiTranslated;
+
+      for(const e of textEntries){
+        const content=originals.get(e.name);
+        if(content==null)continue;
+        const result=/\.xml$/i.test(e.name)?applyXmlTranslations(content,translated.map):applyPropertyTranslations(content,translated.map);
+        if(result.changed){zip.file(e.name,result.content);stats.replacements+=result.changed}
+      }
+
+      stats.image_names=entries.filter((e:any)=>/\.(?:png|jpe?g|webp)$/i.test(String(e.name||""))).map((e:any)=>String(e.name)).slice(0,1000);
+      stats.scan_cursor=0;stats.edit_cursor=0;stats.foreign_images=[];stats.images_scanned=0;stats.images_with_text=0;stats.images_edited=0;
+
+      const workBytes=await zip.generateAsync({type:"uint8array",compression:"DEFLATE",compressionOptions:{level:6}});
+      const up=await sb.storage.from("theme-translation-private").upload(workPath,workBytes,{contentType:"application/zip",upsert:true});
+      if(up.error)throw new Error(`Không lưu được lockscreen tạm: ${up.error.message}`);
+
+      stats.phase=mode==="text"?"final":"scan";
+      await queuePaidJob(jobId,{progress:mode==="text"?90:35,stage:mode==="text"?"Đã dịch văn bản · chuẩn bị đóng gói":`Đã dịch văn bản · chuẩn bị quét ${stats.image_names.length} ảnh trong lockscreen`,stats});
+      return;
     }
 
-    if (mode === "text") {
-      await updatePaidJob(jobId, { progress: 80, stage: "⚡ Đã dịch văn bản · bỏ qua ảnh", stats });
-    } else {
-      await updatePaidJob(jobId, { progress: 45, stage: "Đã dịch text · đang quét ảnh", stats });
-      const imageEntries = entries.filter((e: any) => /\.(?:png|jpe?g|webp)$/i.test(String(e.name || ""))).slice(0, 20);
-      const imageMaxBytes = Math.max(256 * 1024, (Number(env("M4X_THEME_IMAGE_INPUT_MAX_MB", "3.5")) || 3.5) * 1024 * 1024);
+    if(stats.phase==="scan"){
+      const names=stats.image_names.slice(0,1000),cursor=Math.max(0,stats.scan_cursor);
+      if(cursor>=names.length){
+        stats.phase=mode==="scan"?"final":"edit";stats.edit_cursor=0;
+        await queuePaidJob(jobId,{progress:mode==="scan"?90:68,stage:mode==="scan"?"Đã quét ảnh · chuẩn bị đóng gói":`Phát hiện ${stats.foreign_images.length} ảnh có chữ ngoại ngữ`,stats});
+        return;
+      }
 
-      const scanned = await mapLimit(imageEntries, 2, async (e: any) => {
-        try {
-          const bytes = await e.async("uint8array");
-          if (bytes.length > imageMaxBytes) return { name: e.name, bytes, scan: null, skip: "Ảnh quá lớn để quét" };
-          const scan = await inspectImage(bytes, mimeFromName(e.name));
-          return { name: e.name, bytes, scan, skip: "" };
-        } catch (err) {
-          return { name: e.name, bytes: null, scan: null, skip: clip(err instanceof Error ? err.message : String(err), 220) };
+      const dl=await sb.storage.from("theme-translation-private").download(workPath);
+      if(dl.error||!dl.data)throw new Error("Không tải được lockscreen tạm để quét ảnh.");
+      const zip=await JSZip.loadAsync(new Uint8Array(await dl.data.arrayBuffer()));
+      const chunkNames=names.slice(cursor,cursor+60);
+      const imageMaxBytes=Math.max(256*1024,(Number(env("M4X_THEME_IMAGE_INPUT_MAX_MB","3.5"))||3.5)*1024*1024);
+
+      const prepared=await mapLimit(chunkNames,4,async(name:string,localIndex:number)=>{
+        const entry=zip.file(name);
+        if(!entry)return{index:cursor+localIndex,name,bytes:null,mime:mimeFromName(name),skip:"Không tìm thấy ảnh"};
+        try{
+          const bytes=await entry.async("uint8array");
+          if(bytes.length>imageMaxBytes)return{index:cursor+localIndex,name,bytes,mime:mimeFromName(name),skip:"Ảnh quá lớn để quét"};
+          return{index:cursor+localIndex,name,bytes,mime:mimeFromName(name),skip:""};
+        }catch(e){
+          return{index:cursor+localIndex,name,bytes:null,mime:mimeFromName(name),skip:clip(e instanceof Error?e.message:String(e),200)};
         }
       });
 
-      stats.images_scanned = scanned.filter((x: any) => x.scan).length;
-      const foreign = scanned.filter((x: any) => x.scan?.has_non_vietnamese_text);
-      stats.images_with_text = foreign.length;
-      stats.image_texts = foreign.slice(0, 20).map((x: any) => ({ name: x.name, texts: x.scan?.texts || [] }));
-      stats.images_skipped += scanned.filter((x: any) => x.skip).length;
-
-      await updatePaidJob(jobId, { progress: 62, stage: `Phát hiện ${foreign.length} ảnh có chữ cần Việt hóa`, stats });
-
-      if (mode === "scan") {
-        if (foreign.length) stats.warnings.push(`🔎 Phát hiện ${foreign.length} ảnh có chữ. Chế độ SCAN giữ nguyên ảnh.`);
-        await updatePaidJob(jobId, { progress: 82, stage: `🔎 Đã quét ${stats.images_scanned} ảnh · không sửa ảnh`, stats });
-      } else if (foreign.length) {
-        if (env("M4X_THEME_IMAGE_EDIT_ENABLED", "false").toLowerCase() !== "true") {
-          throw new Error("Phát hiện ảnh có chữ nhưng M4X_THEME_IMAGE_EDIT_ENABLED chưa bật.");
-        }
-
-        const editMax = Math.max(1, Math.min(20, Number(env("M4X_THEME_PAID_IMAGE_EDIT_MAX", "20")) || 20));
-        const toEdit = foreign.slice(0, editMax);
-
-        for (let i = 0; i < toEdit.length; i++) {
-          const item: any = toEdit[i];
-
-          await updatePaidJob(jobId, {
-            progress: Math.min(88, 64 + Math.round(((i + 1) / Math.max(1, toEdit.length)) * 22)),
-            stage: `🖼 Đang Việt hóa ảnh ${i + 1}/${toEdit.length}`,
-            stats,
-          });
-
-          try {
-            if (!item.bytes) continue;
-            const srcMime = mimeFromName(item.name);
-            const edited = await editImageToVietnamese(item.bytes, srcMime, item.scan);
-
-            if (!mimeMatchesPath(edited.mime, item.name)) {
-              stats.images_skipped++;
-              stats.warnings.push(`${item.name}: AI trả ${edited.mime}, khác định dạng gốc nên giữ ảnh cũ.`);
-              continue;
-            }
-
-            zip.file(item.name, edited.bytes);
-            stats.images_edited++;
-          } catch (err) {
-            stats.images_skipped++;
-            stats.warnings.push(`${item.name}: ${clip(err instanceof Error ? err.message : String(err), 240)}`);
-          }
-        }
-
-        if (foreign.length > editMax) {
-          stats.warnings.push(`Còn ${foreign.length - editMax} ảnh chưa sửa do giới hạn ${editMax}.`);
-        }
+      const ready=prepared.filter((x:any)=>x.bytes&&!x.skip);
+      const batches:any[][]=[];let batch:any[]=[];let batchBytes=0;
+      for(const item of ready){
+        const size=Number(item.bytes?.length||0);
+        if(batch.length&&(batch.length>=6||batchBytes+size>5*1024*1024)){batches.push(batch);batch=[];batchBytes=0}
+        batch.push(item);batchBytes+=size;
       }
+      if(batch.length)batches.push(batch);
+
+      const scanMap=new Map<number,any>();
+      const groups=await mapLimit(batches,2,async(items:any[])=>{
+        try{return await inspectImageBatch(items.map(x=>({index:x.index,bytes:x.bytes,mime:x.mime})))}
+        catch(_){return await mapLimit(items,2,async(x:any)=>({index:x.index,scan:await inspectImage(x.bytes,x.mime)}))}
+      });
+      for(const group of groups)for(const item of group)scanMap.set(Number(item.index),item.scan);
+
+      const foreignMap=new Map(stats.foreign_images.map((x:any)=>[String(x.name),x]));
+      for(const item of prepared){
+        if(item.skip){stats.images_skipped++;continue}
+        const scan=scanMap.get(Number(item.index));
+        if(!scan)continue;
+        stats.images_scanned++;
+        if(scan.has_non_vietnamese_text)foreignMap.set(String(item.name),{name:String(item.name),texts:Array.isArray(scan.texts)?scan.texts.slice(0,20):[]});
+      }
+
+      stats.foreign_images=Array.from(foreignMap.values());
+      stats.images_with_text=stats.foreign_images.length;
+      stats.scan_cursor=cursor+chunkNames.length;
+      const progress=Math.min(66,36+Math.round((stats.scan_cursor/Math.max(1,names.length))*30));
+
+      await queuePaidJob(jobId,{progress,stage:`🔎 Đã quét ${Math.min(stats.scan_cursor,names.length)}/${names.length} ảnh · phát hiện ${stats.images_with_text} ảnh có chữ ngoại ngữ`,stats});
+      return;
     }
 
-    await updatePaidJob(jobId, { progress: 90, stage: "Đang đóng gói lockscreen", stats });
-    const report = {
-      app: "M4X AI THEME PAID SERVICE V21",
-      source: job.source_file_name,
-      order_code: job.order_code,
-      created_at: new Date().toISOString(),
-      pricing: {
-        amount: job.amount, lockscreen_bytes: job.lockscreen_bytes,
-        images: job.image_count, text_chars: job.text_chars,
-      },
-      stats,
-      note: "V21 chỉ Việt hóa component lockscreen. Các component khác trong MTZ được giữ nguyên.",
-    };
-    const rebuiltLockscreen = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } });
-    outerZip.file(String(lockscreenEntry.name), rebuiltLockscreen);
-    outerZip.file("M4X_TRANSLATION_REPORT.json", JSON.stringify(report, null, 2));
-    const output = await outerZip.generateAsync({ type: "uint8array", compression: "DEFLATE", compressionOptions: { level: 6 } });
-    const outName = outputName(String(job.source_file_name));
-    const resultPath = `result/${job.id}/${outName}`;
-    if (job.result_path) await sb.storage.from("theme-translation-private").remove([String(job.result_path)]).catch(() => {});
-    const up = await sb.storage.from("theme-translation-private").upload(resultPath, output, { contentType: "application/octet-stream", upsert: true });
-    if (up.error) throw new Error(`Không lưu được file kết quả: ${up.error.message}`);
+    if(stats.phase==="edit"){
+      const foreign=stats.foreign_images,cursor=Math.max(0,stats.edit_cursor);
+      if(cursor>=foreign.length){
+        stats.phase="final";
+        await queuePaidJob(jobId,{progress:92,stage:"Đã Việt hóa ảnh có chữ ngoại ngữ · chuẩn bị đóng gói",stats});
+        return;
+      }
 
-    await updatePaidJob(jobId, {
-      status: "done", progress: 100, stage: "Hoàn tất · sẵn sàng tải",
-      stats, result_path: resultPath, result_file_name: outName, error: null,
-      finished_at: new Date().toISOString(),
-    });
-    await ownerNotify(`✅ V21 ĐÃ DỊCH XONG\n\nĐơn: ${job.order_code}\nFile: ${job.source_file_name}\nGiá: ${Number(job.amount || 0).toLocaleString("vi-VN")}đ\nText thay: ${stats.replacements}\nẢnh sửa: ${stats.images_edited}/${stats.images_with_text}`);
-  } catch (e) {
-    const message = clip(e instanceof Error ? e.message : String(e), 1800);
+      if(env("M4X_THEME_IMAGE_EDIT_ENABLED","false").toLowerCase()!=="true")throw new Error("M4X_THEME_IMAGE_EDIT_ENABLED chưa bật.");
+
+      const dl=await sb.storage.from("theme-translation-private").download(workPath);
+      if(dl.error||!dl.data)throw new Error("Không tải được lockscreen tạm để sửa ảnh.");
+      const zip=await JSZip.loadAsync(new Uint8Array(await dl.data.arrayBuffer()));
+      const chunk=foreign.slice(cursor,cursor+4);
+
+      const edited=await mapLimit(chunk,2,async(info:any)=>{
+        try{
+          const entry=zip.file(String(info.name));
+          if(!entry)throw new Error("Không tìm thấy ảnh trong lockscreen.");
+          const bytes=await entry.async("uint8array");
+          const srcMime=mimeFromName(String(info.name));
+          const out=await editImageToVietnamese(bytes,srcMime,{texts:info.texts||[]});
+          if(!mimeMatchesPath(out.mime,String(info.name)))throw new Error(`AI trả ${out.mime}, khác định dạng ảnh gốc.`);
+          return{ok:true,name:String(info.name),bytes:out.bytes};
+        }catch(e){return{ok:false,name:String(info.name),error:clip(e instanceof Error?e.message:String(e),240)}}
+      });
+
+      for(const item of edited){
+        if(item.ok){zip.file(item.name,item.bytes);stats.images_edited++}
+        else{stats.images_skipped++;stats.warnings.push(`${item.name}: ${item.error}`)}
+      }
+
+      stats.edit_cursor=cursor+chunk.length;
+      const workBytes=await zip.generateAsync({type:"uint8array",compression:"DEFLATE",compressionOptions:{level:6}});
+      const up=await sb.storage.from("theme-translation-private").upload(workPath,workBytes,{contentType:"application/zip",upsert:true});
+      if(up.error)throw new Error(`Không lưu được lockscreen đang sửa: ${up.error.message}`);
+
+      const progress=Math.min(91,69+Math.round((stats.edit_cursor/Math.max(1,foreign.length))*22));
+      await queuePaidJob(jobId,{progress,stage:`🖼 Đã sửa ${Math.min(stats.edit_cursor,foreign.length)}/${foreign.length} ảnh có chữ ngoại ngữ`,stats});
+      return;
+    }
+
+    if(stats.phase==="final"){
+      await updatePaidJob(jobId,{progress:94,stage:"Đang đóng gói lại MTZ",stats});
+      const [srcDl,workDl]=await Promise.all([
+        sb.storage.from("theme-translation-private").download(String(job.source_path)),
+        sb.storage.from("theme-translation-private").download(workPath)
+      ]);
+      if(srcDl.error||!srcDl.data)throw new Error("Không tải được MTZ nguồn để đóng gói.");
+      if(workDl.error||!workDl.data)throw new Error("Không tải được lockscreen đã Việt hóa.");
+
+      const outerZip=await JSZip.loadAsync(new Uint8Array(await srcDl.data.arrayBuffer()));
+      const rebuiltLockscreen=new Uint8Array(await workDl.data.arrayBuffer());
+      const outerEntries=Object.values(outerZip.files).filter((f:any)=>!f.dir) as any[];
+      const lockscreenEntry=outerEntries.find((e:any)=>String(e.name)===String(job.lockscreen_entry))
+        ||outerEntries.find((e:any)=>/(?:^|\/)lockscreen(?:\.zip)?$/i.test(String(e.name)))
+        ||outerEntries.find((e:any)=>/(?:^|\/)lockscreen[^/]*$/i.test(String(e.name)));
+      if(!lockscreenEntry)throw new Error("Không tìm thấy lockscreen khi đóng gói.");
+
+      outerZip.file(String(lockscreenEntry.name),rebuiltLockscreen);
+      outerZip.file("M4X_TRANSLATION_REPORT.json",JSON.stringify({
+        app:"M4X AI THEME V22",source:job.source_file_name,order_code:job.order_code,created_at:new Date().toISOString(),
+        policy:{scope:"lockscreen_only",translate_text:true,scan_images:true,edit_only_non_vietnamese_text_images:true},stats
+      },null,2));
+
+      const output=await outerZip.generateAsync({type:"uint8array",compression:"DEFLATE",compressionOptions:{level:6}});
+      const outName=outputName(String(job.source_file_name));
+      const resultPath=`result/${job.id}/${outName}`;
+      if(job.result_path)await sb.storage.from("theme-translation-private").remove([String(job.result_path)]).catch(()=>{});
+      const up=await sb.storage.from("theme-translation-private").upload(resultPath,output,{contentType:"application/octet-stream",upsert:true});
+      if(up.error)throw new Error(`Không lưu được file kết quả: ${up.error.message}`);
+
+      stats.phase="done";
+      await updatePaidJob(jobId,{status:"done",progress:100,stage:"Hoàn tất · sẵn sàng tải",stats,result_path:resultPath,result_file_name:outName,error:null,finished_at:new Date().toISOString()});
+      await sb.storage.from("theme-translation-private").remove([workPath]).catch(()=>{});
+      await ownerNotify(`✅ V22 ĐÃ DỊCH XONG\n\nĐơn: ${job.order_code}\nFile: ${job.source_file_name}\nText thay: ${stats.replacements}\nẢnh quét: ${stats.images_scanned}\nẢnh có chữ ngoại ngữ: ${stats.images_with_text}\nẢnh sửa: ${stats.images_edited}`);
+      return;
+    }
+
+    throw new Error(`Phase V22 không hợp lệ: ${stats.phase}`);
+  }catch(e){
+    const message=clip(e instanceof Error?e.message:String(e),1800);
     stats.warnings.push(message);
-    await updatePaidJob(jobId, {
-      status: "failed", stage: "Dịch thất bại", error: message, stats,
-      finished_at: new Date().toISOString(),
-    }).catch(() => {});
-    await ownerNotify(`❌ V21 DỊCH THẤT BẠI\n\nĐơn: ${job.order_code}\nFile: ${job.source_file_name}\nLỗi: ${message}`);
+    await updatePaidJob(jobId,{status:"failed",stage:"Dịch thất bại",error:message,stats,finished_at:new Date().toISOString()}).catch(()=>{});
+    await ownerNotify(`❌ V22 DỊCH THẤT BẠI\n\nĐơn: ${job.order_code}\nFile: ${job.source_file_name}\nLỗi: ${message}`);
     throw e;
   }
 }

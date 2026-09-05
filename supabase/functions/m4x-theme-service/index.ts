@@ -107,9 +107,9 @@ function publicPricing(p: any) {
   return {
     enabled: !!p.enabled,
     base_price: Number(p.base_price || 10000),
-    max_lockscreen_mb: Number(p.max_lockscreen_mb || 18),
-    max_images: Number(p.max_images || 20),
-    max_mtz_mb: Number(p.max_mtz_mb || 50),
+    max_lockscreen_mb: Number(p.max_lockscreen_mb || 60),
+    max_images: Number(p.max_images || 1000),
+    max_mtz_mb: Number(p.max_mtz_mb || 100),
     quote_minutes: Number(p.quote_minutes || 30),
     size_tiers: p.size_tiers || [],
     image_tiers: p.image_tiers || [],
@@ -147,7 +147,7 @@ async function prepareUpload(body: any) {
   if (!/\.mtz$/i.test(originalName)) throw new Error("Chỉ hỗ trợ file .mtz.");
 
   const fileSize = Number(body?.file_size || 0);
-  const maxMtzBytes = Number(pricing.max_mtz_mb || 50) * 1024 * 1024;
+  const maxMtzBytes = Number(pricing.max_mtz_mb || 100) * 1024 * 1024;
   if (!fileSize) throw new Error("File MTZ rỗng.");
   if (fileSize > maxMtzBytes) {
     throw new Error(`MTZ ${(fileSize/1048576).toFixed(1)}MB vượt giới hạn ${pricing.max_mtz_mb}MB.`);
@@ -174,7 +174,7 @@ async function prepareUpload(body: any) {
       token: data.token,
     },
     mode,
-    max_mtz_mb: Number(pricing.max_mtz_mb || 50),
+    max_mtz_mb: Number(pricing.max_mtz_mb || 100),
   };
 }
 
@@ -189,7 +189,7 @@ async function quote(req: Request) {
   const originalName = safeName(file.name || "theme.mtz");
   if (!/\.mtz$/i.test(originalName)) throw new Error("Chỉ hỗ trợ file .mtz.");
   const mtzBytes = new Uint8Array(await file.arrayBuffer());
-  const maxMtzBytes = Number(pricing.max_mtz_mb || 50) * 1024 * 1024;
+  const maxMtzBytes = Number(pricing.max_mtz_mb || 100) * 1024 * 1024;
   if (!mtzBytes.length) throw new Error("File MTZ rỗng.");
   if (mtzBytes.length > maxMtzBytes) throw new Error(`MTZ ${(mtzBytes.length/1048576).toFixed(1)}MB vượt giới hạn ${pricing.max_mtz_mb}MB.`);
 
@@ -201,7 +201,7 @@ async function quote(req: Request) {
   if (!lockEntry) throw new Error("Không tìm thấy component lockscreen trong MTZ.");
   const lockBytes = await lockEntry.async("uint8array");
   const lockMb = lockBytes.length / 1048576;
-  if (lockMb > Number(pricing.max_lockscreen_mb || 18)) {
+  if (lockMb > Number(pricing.max_lockscreen_mb || 60)) {
     throw new Error(`Lockscreen ${lockMb.toFixed(1)}MB vượt giới hạn ${pricing.max_lockscreen_mb}MB.`);
   }
 
@@ -209,7 +209,7 @@ async function quote(req: Request) {
   try { lockZip = await JSZip.loadAsync(lockBytes); } catch (_) { throw new Error("Component lockscreen không phải ZIP hợp lệ."); }
   const entries = Object.values(lockZip.files).filter((f: any) => !f.dir) as any[];
   const imageEntries = entries.filter((e: any) => /\.(?:png|jpe?g|webp)$/i.test(String(e.name || "")));
-  if (imageEntries.length > Number(pricing.max_images || 20)) {
+  if (imageEntries.length > Number(pricing.max_images || 1000)) {
     throw new Error(`Lockscreen có ${imageEntries.length} ảnh, vượt giới hạn ${pricing.max_images} ảnh.`);
   }
   const imageEditEnabled = env("M4X_THEME_IMAGE_EDIT_ENABLED", "false").toLowerCase() === "true";
@@ -316,7 +316,7 @@ async function quoteUploaded(body: any) {
   const sourcePath = clip(body?.source_path, 500);
   if (!/^source\/[0-9a-f-]{36}\//i.test(sourcePath)) throw new Error("Đường dẫn upload không hợp lệ.");
   const expectedSize = Number(body?.file_size || 0);
-  const maxMtzBytes = Number(pricing.max_mtz_mb || 50) * 1024 * 1024;
+  const maxMtzBytes = Number(pricing.max_mtz_mb || 100) * 1024 * 1024;
   if (expectedSize <= 0) throw new Error("File MTZ rỗng.");
   if (expectedSize > maxMtzBytes) throw new Error(`MTZ ${(expectedSize/1048576).toFixed(1)}MB vượt giới hạn ${pricing.max_mtz_mb}MB.`);
   const sb = adminClient();
@@ -335,7 +335,7 @@ async function quoteUploaded(body: any) {
   if (!lockEntry) throw new Error("Không tìm thấy component lockscreen trong MTZ.");
   const lockBytes = await lockEntry.async("uint8array");
   const lockMb = lockBytes.length / 1048576;
-  if (lockMb > Number(pricing.max_lockscreen_mb || 18)) {
+  if (lockMb > Number(pricing.max_lockscreen_mb || 60)) {
     throw new Error(`Lockscreen ${lockMb.toFixed(1)}MB vượt giới hạn ${pricing.max_lockscreen_mb}MB.`);
   }
 
@@ -343,7 +343,7 @@ async function quoteUploaded(body: any) {
   try { lockZip = await JSZip.loadAsync(lockBytes); } catch (_) { throw new Error("Component lockscreen không phải ZIP hợp lệ."); }
   const entries = Object.values(lockZip.files).filter((f: any) => !f.dir) as any[];
   const imageEntries = entries.filter((e: any) => /\.(?:png|jpe?g|webp)$/i.test(String(e.name || "")));
-  if (imageEntries.length > Number(pricing.max_images || 20)) {
+  if (imageEntries.length > Number(pricing.max_images || 1000)) {
     throw new Error(`Lockscreen có ${imageEntries.length} ảnh, vượt giới hạn ${pricing.max_images} ảnh.`);
   }
   const imageEditEnabled = env("M4X_THEME_IMAGE_EDIT_ENABLED", "false").toLowerCase() === "true";
