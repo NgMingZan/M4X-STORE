@@ -605,27 +605,8 @@ YÊU CẦU LẦN 2:
 // ===== END M4X V22.5.1 =====
 
 async function inspectImage(bytes: Uint8Array, mime: string) {
-  const errors: string[] = [];
-
-  try {
-    const x = await inspectImageOpenRouterWithRetry(bytes, mime);
-    if (x) return x;
-  } catch (e) {
-    errors.push(`OpenRouter Vision: ${e instanceof Error ? e.message : String(e)}`);
-  }
-
-  try {
-    const x = await inspectImageGemini(bytes, mime);
-    if (x) return { ...x, provider: "gemini" };
-  } catch (e) {
-    errors.push(`Gemini Vision: ${e instanceof Error ? e.message : String(e)}`);
-  }
-
-  const message = `Không có AI Vision khả dụng. ${errors.join(" | ")}`;
-  if (errors.some(isQuotaLikeError)) {
-    throw new Error(`AI_RATE_LIMIT: ${message}`);
-  }
-  throw new Error(message);
+  const result=await inspectImageBatch([{index:0,bytes,mime}]);
+  return result?.[0]?.scan||{has_text:false,has_non_vietnamese_text:false,texts:[]};
 }
 
 function extractInteractionImage(j: any): { bytes: Uint8Array; mime: string } | null {
@@ -716,7 +697,144 @@ async function queuePaidJob(jobId: string, patch: Record<string, unknown>) {
   await continuePaidJob(jobId);
 }
 
-async function inspectImageBatch(items: Array<{ index: number; bytes: Uint8Array; mime: string }>) {
+
+// ===== M4X V22.5.2 VISION FAILOVER REBUILD =====
+function m4xVisionParse(raw: string) {
+  const text = String(raw || "").trim();
+  if (!text) return null;
+  const xs: string[] = [text];
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence?.[1]) xs.push(fence[1].trim());
+  const a = text.indexOf("{"), b = text.lastIndexOf("}");
+  if (a >= 0 && b > a) xs.push(text.slice(a, b + 1));
+  for (const x of xs) {
+    try { const j = JSON.parse(x); if (j && typeof j === "object") return j; } catch (_) {}
+  }
+  return null;
+}
+function m4xVisionRows(j: any, expected: number[]) {
+  const rows = Array.isArray(j) ? j : (Array.isArray(j?.results) ? j.results : null);
+  if (!rows) return null;
+  const by = new Map<number, any>();
+  for (const r of rows) {
+    const index = Number(r?.index);
+    if (!Number.isInteger(index)) continue;
+    by.set(index, { index, scan: {
+      has_text: !!r?.has_text,
+      has_non_vietnamese_text: !!r?.has_non_vietnamese_text,
+      texts: Array.isArray(r?.texts) ? r.texts.slice(0,20) : []
+    }});
+  }
+  if (!expected.every(x => by.has(x))) return null;
+  return expected.map(x => by.get(x));
+}
+function m4xRetryableAI(message: string) {
+  return /(?:AI_RATE_LIMIT|\b429\b|quota exceeded|exceeded your current quota|rate.?limit|resource_exhausted|too many requests|please retry in)/i.test(String(message || ""));
+}
+function m4xRetrySeconds(message: string) {
+  const m = String(message || "");
+  const x = m.match(/(?:please )?retry in\s*([0-9.]+)s/i);
+  if (x) return Math.max(25, Math.min(300, Math.ceil(Number(x[1])) + 6));
+  return 45;
+}
+async function m4xQueueAIRetry(jobId: string, stats: any, message: string) {
+  const count = Math.max(0, Number(stats?.ai_retry_count || 0)) + 1;
+  const seconds = Math.min(300, Math.max(m4xRetrySeconds(message), 30 * Math.pow(2, Math.min(count-1, 3))));
+  stats.ai_retry_count = count;
+  stats.ai_retry_at = new Date(Date.now() + seconds * 1000).toISOString();
+  stats.last_ai_rate_limit = clip(message, 700);
+  await updatePaidJob(jobId, {
+    status:"queued",
+    stage:`AI tạm giới hạn · tự tiếp tục sau ${seconds}s`,
+    error:null,
+    stats,
+    finished_at:null
+  });
+  const task = (async()=>{
+    await new Promise(r=>setTimeout(r, seconds*1000));
+    await continuePaidJob(jobId);
+  })().catch(e=>console.error("V22.5.2 retry failed", e));
+  const rt=(globalThis as any).EdgeRuntime;
+  if(rt?.waitUntil) rt.waitUntil(task); else await task;
+  return seconds;
+}
+async function m4xGroqVision(items: Array<{index:number;bytes:Uint8Array;mime:string}>) {
+  const key=env("GROQ_API_KEY");
+  if(!key) return null;
+  const model=env("GROQ_VISION_MODEL","meta-llama/llama-4-scout-17b-16e-instruct");
+  const expected=items.map(x=>x.index);
+  const content:any[]=[{type:"text",text:`Phân tích các ảnh asset LOCKSCREEN Xiaomi/HyperOS.
+Trả DUY NHẤT JSON object:
+{"results":[{"index":NUMBER,"has_text":BOOLEAN,"has_non_vietnamese_text":BOOLEAN,"texts":[{"src":"...","vi":"..."}]}]}
+Giữ đúng index: ${JSON.stringify(expected)}.
+Chỉ tính chữ hiển thị trực tiếp. Không tính giờ, % pin, logo thương hiệu, ký hiệu đơn lẻ.`}];
+  for(const x of items) content.push({type:"image_url",image_url:{url:`data:${x.mime};base64,${bytesToBase64(x.bytes)}`}});
+  const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{
+    method:"POST",
+    headers:{"Authorization":`Bearer ${key}`,"Content-Type":"application/json"},
+    body:JSON.stringify({model,messages:[{role:"user",content}],temperature:0,max_tokens:1200,response_format:{type:"json_object"}})
+  });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j?.error?.message||`Groq Vision lỗi ${r.status}`);
+  const rows=m4xVisionRows(m4xVisionParse(String(j?.choices?.[0]?.message?.content||"")),expected);
+  if(!rows) throw new Error("Groq Vision không trả đủ JSON kết quả.");
+  return rows;
+}
+async function m4xOpenRouterVision(items: Array<{index:number;bytes:Uint8Array;mime:string}>) {
+  const key=env("OPENROUTER_API_KEY");
+  if(!key) return null;
+  const model=env("OPENROUTER_VISION_MODEL","openrouter/free");
+  const expected=items.map(x=>x.index);
+  const content:any[]=[{type:"text",text:`Phân tích các ảnh LOCKSCREEN. Giữ đúng index ${JSON.stringify(expected)} và chỉ trả JSON theo schema.`}];
+  for(const x of items) content.push({type:"image_url",image_url:{url:`data:${x.mime};base64,${bytesToBase64(x.bytes)}`}});
+  const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{
+    method:"POST",
+    headers:{
+      "Authorization":`Bearer ${key}`,
+      "Content-Type":"application/json",
+      "HTTP-Referer":env("PUBLIC_STORE_URL","https://m4x-store.pages.dev"),
+      "X-Title":"M4X STORE AI Theme"
+    },
+    body:JSON.stringify({
+      model,messages:[{role:"user",content}],temperature:0,max_tokens:1200,
+      response_format:{type:"json_schema",json_schema:{name:"m4x_vision",strict:true,schema:{
+        type:"object",properties:{results:{type:"array",items:{type:"object",properties:{
+          index:{type:"integer"},has_text:{type:"boolean"},has_non_vietnamese_text:{type:"boolean"},
+          texts:{type:"array",items:{type:"object",properties:{src:{type:"string"},vi:{type:"string"}},required:["src","vi"],additionalProperties:false}}
+        },required:["index","has_text","has_non_vietnamese_text","texts"],additionalProperties:false}}},required:["results"],additionalProperties:false
+      }}}
+    })
+  });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j?.error?.message||`OpenRouter Vision lỗi ${r.status}`);
+  const rows=m4xVisionRows(m4xVisionParse(String(j?.choices?.[0]?.message?.content||"")),expected);
+  if(!rows) throw new Error("OpenRouter Vision không trả đủ JSON kết quả.");
+  return rows;
+}
+// ===== END M4X V22.5.2 =====
+
+
+async function inspectImageBatch(items: Array<{ index:number; bytes:Uint8Array; mime:string }>) {
+  if(!items.length) return [];
+  const all:any[]=[];
+  for(let i=0;i<items.length;i+=5){
+    const chunk=items.slice(i,i+5);
+    const errors:string[]=[];
+    let rows:any=null;
+    try{rows=await m4xGroqVision(chunk)}catch(e){errors.push(`Groq Vision: ${e instanceof Error?e.message:String(e)}`)}
+    if(!rows)try{rows=await m4xOpenRouterVision(chunk)}catch(e){errors.push(`OpenRouter Vision: ${e instanceof Error?e.message:String(e)}`)}
+    if(!rows)try{rows=await inspectImageBatchGemini(chunk)}catch(e){errors.push(`Gemini Vision: ${e instanceof Error?e.message:String(e)}`)}
+    if(!rows){
+      const message=`Không có AI Vision khả dụng. ${errors.join(" | ")}`;
+      if(errors.some(m4xRetryableAI)) throw new Error(`AI_RATE_LIMIT: ${message}`);
+      throw new Error(message);
+    }
+    all.push(...rows);
+  }
+  return all;
+}
+
+async function inspectImageBatchGemini(items: Array<{ index: number; bytes: Uint8Array; mime: string }>) {
   if (!items.length) return [];
   const key = env("GEMINI_API_KEY");
   if (!key) throw new Error("Thiếu GEMINI_API_KEY để quét chữ trong ảnh.");
@@ -1007,6 +1125,13 @@ async function processPaidJob(jobId: string) {
     throw new Error(`Phase V22 không hợp lệ: ${stats.phase}`);
   }catch(e){
     const message=clip(e instanceof Error?e.message:String(e),1800);
+
+    if(m4xRetryableAI(message)){
+      stats.warnings.push(message);
+      const seconds=await m4xQueueAIRetry(jobId,stats,message);
+      return json({ok:true,queued:true,reason:"ai_rate_limit",retry_after_seconds:seconds});
+    }
+
     stats.warnings.push(message);
     await updatePaidJob(jobId,{status:"failed",stage:"Dịch thất bại",error:message,stats,finished_at:new Date().toISOString()}).catch(()=>{});
     await ownerNotify(`❌ V22 DỊCH THẤT BẠI\n\nĐơn: ${job.order_code}\nFile: ${job.source_file_name}\nLỗi: ${message}`);
