@@ -1,0 +1,1 @@
+(()=>{try{if(/theme-translator\.html/i.test(location.pathname)||document.getElementById('m4xThemePaidV21'))return;const a=document.createElement('a');a.id='m4xThemePaidV21';a.className='v21-entry';a.href='./theme-translator.html';a.innerHTML='<span>🌐</span><span>AI Dịch Theme</span>';document.body.appendChild(a)}catch(e){console.warn('M4X V21 entry',e)}})();
