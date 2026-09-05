@@ -1,6 +1,8 @@
 /* M4X STORE V8 - Community + Cart + QR + Themes + Badges + Custom Orders */
 (() => {
   const V8 = window.M4XV8 = window.M4XV8 || {};
+  const THEME_SERVICE_ID='00000000-0000-4000-8000-000000002100';
+  const isThemeService=p=>String(p?.id||'')===THEME_SERVICE_ID;
   const BADGE_LABELS = {
     early_user:'🌟 Early User',
     vip:'💎 VIP',
@@ -42,7 +44,7 @@
   }
 
   function v8CartIds(){
-    try{return [...new Set(JSON.parse(localStorage.getItem('m4x_cart')||'[]'))].filter(Boolean)}catch{return []}
+    try{return [...new Set(JSON.parse(localStorage.getItem('m4x_cart')||'[]'))].filter(id=>id&&String(id)!==THEME_SERVICE_ID)}catch{return []}
   }
   function v8SaveCart(ids){localStorage.setItem('m4x_cart',JSON.stringify([...new Set(ids)]));v8UpdateCartBadge()}
   function v8CartProducts(){
@@ -56,6 +58,7 @@
   }
   function v8AddCart(id){
     const p=state.products.find(x=>x.id===id);if(!p)return;
+    if(isThemeService(p)){location.href='./theme-translator.html';return}
     if(p.delivery_type==='download'&&state.owned.has(id)){alert('File này bạn đã sở hữu. Hãy tải lại trong Thư viện.');return}
     if(['coming_soon','out_of_stock','discontinued'].includes(p.sale_status)){alert('Sản phẩm hiện chưa thể mua.');return}
     const ids=v8CartIds();
@@ -164,8 +167,9 @@
 
   const v8OldProduct = product;
   product = function(id){
-    v8OldProduct(id);
     const p=state.products.find(x=>x.id===id);if(!p)return;
+    if(isThemeService(p)){location.href='./theme-translator.html';return}
+    v8OldProduct(id);
     const host=$('modalContent');if(!host)return;
     const actions=document.createElement('div');
     actions.className='toolbar v8ProductTools';

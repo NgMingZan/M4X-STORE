@@ -3,6 +3,9 @@ const BASE = window.M4X_CONFIG || {};
 try{localStorage.removeItem('m4x_supabase_config')}catch{}
 const C={...BASE,SUPABASE_URL:BASE.SUPABASE_URL||'',SUPABASE_ANON_KEY:BASE.SUPABASE_ANON_KEY||''};
 const sb=supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY);
+const THEME_SERVICE_ID='00000000-0000-4000-8000-000000002100';
+const isThemeService=p=>String(p?.id||'')===THEME_SERVICE_ID;
+function openThemeTranslator(){location.href='./theme-translator.html'}
 
 const state={
   me:null,profile:null,products:[],categories:[],owned:new Map(),
@@ -61,6 +64,7 @@ async function loadProducts(){
     return 0;
   });
   state.products=p||[];
+  state.products.sort((a,b)=>Number(isThemeService(b))-Number(isThemeService(a)));
 }
 async function loadNotifications(){
   state.notifications=[];
@@ -110,6 +114,7 @@ function available(p){
     :Infinity;
 }
 function actionLabel(p){
+  if(isThemeService(p))return 'Gửi MTZ & báo giá';
   const o=state.owned.get(p.id);
   if(o)return p.delivery_type==='download'?'Tải':'Đã mua';
   if(p.sale_status==='coming_soon')return 'Sắp ra mắt';
@@ -137,7 +142,7 @@ function renderStore(){
       <div class="cardbody">
         <div class="name">${esc(p.name)}</div>
         <div class="row">
-          <div><div class="price">${money(p.price)}</div><div class="stock">${p.stock_mode==='limited'?'Còn '+available(p):statusText(p.sale_status)}</div></div>
+          <div><div class="price">${isThemeService(p)?'Từ 10.000đ':money(p.price)}</div><div class="stock">${isThemeService(p)?'Giá tự tính theo file':(p.stock_mode==='limited'?'Còn '+available(p):statusText(p.sale_status))}</div></div>
           <button class="btn" ${disabled?'disabled':''} onclick="event.stopPropagation();M4X.action('${p.id}')">${label}</button>
         </div>
       </div>
@@ -165,6 +170,7 @@ function galleryHtml(p){
 }
 function product(id){
   const p=state.products.find(x=>x.id===id); if(!p)return;
+  if(isThemeService(p))return openThemeTranslator();
   const o=state.owned.get(id), label=actionLabel(p);
   const canBuy=!o&&!['coming_soon','out_of_stock','discontinued'].includes(p.sale_status);
   const risk=p.risk_note?`<div class="notice"><b>Lưu ý trước khi dùng</b><br>${esc(p.risk_note)}</div>`:'';
@@ -195,6 +201,7 @@ function product(id){
 }
 async function action(id){
   const p=state.products.find(x=>x.id===id),o=state.owned.get(id);if(!p)return;
+  if(isThemeService(p))return openThemeTranslator();
   if(o&&p.delivery_type==='download')return download(o.order_code,o.access_token);
   product(id);
 }
@@ -248,6 +255,7 @@ async function logout(){
   await sb.auth.signOut();state.me=null;state.profile=null;state.owned.clear();state.notifications=[];closeModal();await bootstrap();setView('store');
 }
 async function buy(id){
+  if(String(id)===THEME_SERVICE_ID)return openThemeTranslator();
   const {data,error}=await sb.rpc('wallet_purchase',{p_product_id:id,p_quantity:1});
   if(error){
     const msg=String(error.message||'');

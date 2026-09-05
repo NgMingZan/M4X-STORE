@@ -4,6 +4,8 @@
    ========================================================= */
 (() => {
   let priceFilter='all';
+  const THEME_SERVICE_ID='00000000-0000-4000-8000-000000002100';
+  const isThemeService=p=>String(p?.id||'')===THEME_SERVICE_ID;
   const favKey='m4x_lux_favorites';
   const favs=()=>{try{return new Set(JSON.parse(localStorage.getItem(favKey)||'[]'))}catch{return new Set()}};
   const saveFav=s=>localStorage.setItem(favKey,JSON.stringify([...s]));
@@ -86,6 +88,7 @@
 
   function action(id){
     const p=state.products.find(x=>x.id===id);if(!p)return;
+    if(isThemeService(p)){location.href='./theme-translator.html';return}
     const o=state.owned.get(id);
     if(o&&p.delivery_type==='download')return M4X.download(o.order_code,o.access_token);
     return M4X.product(id);
@@ -102,18 +105,18 @@
       <div class="lux-body">
         <div class="lux-meta"><span class="lux-cat">${esc(p.categories?.name||'Sản phẩm')}</span><span class="lux-rating">${ratingText(p)}</span></div>
         <div class="lux-name" onclick="M4X.product('${p.id}')">${esc(p.name)}</div>
-        <div class="lux-price">${money(p.price)}</div>
+        <div class="lux-price">${isThemeService(p)?'Từ 10.000đ':money(p.price)}</div>
         <div class="lux-bottom">
           <span class="lux-sold">Đã bán ${Number(p.sold_count||0)}</span>
           <button class="btn lux-buy ${o&&p.delivery_type==='download'?'owned':''}" ${disabled?'disabled':''}
-            onclick="M4XLux.action('${p.id}')">${o&&p.delivery_type==='download'?'Tải lại':'Mua'}</button>
+            onclick="M4XLux.action('${p.id}')">${isThemeService(p)?'🌐 Gửi MTZ & báo giá':(o&&p.delivery_type==='download'?'Tải lại':'Mua')}</button>
         </div>
       </div>
     </article>`;
   }
 
   function renderStoreLux(){
-    const list=filtered();
+    const list=filtered().sort((a,b)=>Number(isThemeService(b))-Number(isThemeService(a)));
     const cats=`<button class="chip ${state.activeCat==='all'?'active':''}" data-lux-cat="all">Tất cả</button>`+
       state.categories.map(c=>`<button class="chip ${String(c.id)===String(state.activeCat)?'active':''}" data-lux-cat="${c.id}">${esc(c.name)}</button>`).join('');
 
