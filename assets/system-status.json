@@ -1,18 +1,18 @@
 {
-  "updated_at": "2026-09-03T11:51:41.277791+07:00",
-  "message": "Hệ thống M4X STORE đang hoạt động bình thường.",
+  "updated_at": "2026-09-05T19:15:37.386618+07:00",
+  "message": "M4X STORE đang bảo trì. Mua hàng, nạp tiền và tải file tạm thời bị khóa.",
   "services": {
     "store": {
-      "status": "operational",
-      "note": "Website và ứng dụng hoạt động bình thường."
+      "status": "maintenance",
+      "note": "M4X STORE đang bảo trì."
     },
     "downloads": {
-      "status": "operational",
-      "note": "Hệ thống tải sản phẩm hoạt động bình thường."
+      "status": "maintenance",
+      "note": "Hệ thống tải file đang tạm bảo trì."
     },
     "payments": {
-      "status": "operational",
-      "note": "Nạp tiền và thanh toán ví M4X hoạt động bình thường."
+      "status": "maintenance",
+      "note": "Mua hàng và nạp tiền đang tạm bảo trì."
     },
     "telegram": {
       "status": "maintenance",
