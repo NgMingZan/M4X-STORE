@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>M4X TOOLBOX</title>
+  <meta name="theme-color" content="#0b0d12"/>
+  <link rel="stylesheet" href="assets/m4x-toolbox.css"/>
+</head>
+<body>
+  <header class="topbar">
+    <a href="/" class="back">←</a>
+    <div>
+      <div class="eyebrow">M4X STORE</div>
+      <h1>M4X TOOLBOX</h1>
+    </div>
+    <span class="badge">V3</span>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h2>Công cụ thực dụng cho M4X STORE & Theme Xiaomi</h2>
+      <p>Phần lớn chạy ngay trên máy, không cần đăng nhập, không dùng quota Supabase.</p>
+    </section>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="theme">Theme</button>
+      <button class="tab" data-tab="store">Store</button>
+      <button class="tab" data-tab="network">Mạng</button>
+      <button class="tab" data-tab="dev">Dev</button>
+    </div>
+
+    <section class="grid tabpanel active" id="tab-theme">
+      <article class="card">
+        <div class="icon">📦</div><h3>Kiểm tra MTZ / ZIP</h3>
+        <p>Đọc dung lượng file, số ảnh, XML, tổng ký tự và ước tính phí Việt hoá.</p>
+        <input id="mtzFile" type="file" accept=".mtz,.zip"/>
+        <button onclick="analyzeArchive()">Phân tích file</button>
+        <div id="mtzResult" class="result"></div>
+      </article>
+
+      <article class="card">
+        <div class="icon">📝</div><h3>Đếm XML / Văn bản</h3>
+        <p>Đếm ký tự, dòng, từ và ước tính phụ phí XML.</p>
+        <textarea id="xmlText" placeholder="Dán XML hoặc văn bản vào đây..."></textarea>
+        <button onclick="countText()">Phân tích</button>
+        <div id="textResult" class="result"></div>
+      </article>
+
+      <article class="card">
+        <div class="icon">💰</div><h3>Tính phí dịch Theme</h3>
+        <p>Theo bảng giá M4X: dung lượng + ảnh + lượng văn bản.</p>
+        <div class="row3">
+          <input id="sizeMb" type="number" min="0" step="0.1" placeholder="MB"/>
+          <input id="imgCount" type="number" min="0" placeholder="Số ảnh"/>
+          <input id="charCount" type="number" min="0" placeholder="Ký tự"/>
+        </div>
+        <button onclick="calcThemePrice()">Tính giá</button>
+        <div id="priceResult" class="result"></div>
+      </article>
+
+      <article class="card">
+        <div class="icon">🖼️</div><h3>Đổi ảnh PNG/JPG/WebP</h3>
+        <p>Chuyển định dạng ảnh trực tiếp trong trình duyệt.</p>
+        <input id="imageFile" type="file" accept="image/*"/>
+        <select id="imageFormat"><option value="image/png">PNG</option><option value="image/jpeg">JPG</option><option value="image/webp">WebP</option></select>
+        <button onclick="convertImage()">Chuyển ảnh</button>
+        <div id="imageResult" class="result"></div>
+      </article>
+    </section>
+
+    <section class="grid tabpanel" id="tab-store">
+      <article class="card">
+        <div class="icon">🏦</div><h3>Tạo QR chuyển khoản</h3>
+        <p>Tạo VietQR từ ngân hàng, STK, số tiền và nội dung.</p>
+        <input id="bankId" placeholder="BIN ngân hàng, VD: 970436"/>
+        <input id="accountNo" placeholder="Số tài khoản"/>
+        <input id="accountName" placeholder="Tên tài khoản"/>
+        <input id="amount" type="number" placeholder="Số tiền"/>
+        <input id="addInfo" placeholder="Nội dung chuyển khoản"/>
+        <button onclick="makeVietQR()">Tạo QR</button>
+        <div id="vietqrResult" class="result"></div>
+      </article>
+
+      <article class="card">
+        <div class="icon">🔳</div><h3>Tạo QR Link / Wi‑Fi</h3>
+        <select id="qrType" onchange="toggleQrType()"><option value="text">Link / Văn bản</option><option value="wifi">Wi‑Fi</option></select>
+        <div id="qrTextBox"><input id="qrText" placeholder="https://m4x-store.pages.dev"/></div>
+        <div id="wifiBox" class="hidden">
+          <input id="wifiSsid" placeholder="Tên Wi‑Fi"/>
+          <input id="wifiPass" placeholder="Mật khẩu"/>
+          <select id="wifiSec"><option>WPA</option><option>WEP</option><option value="nopass">Không mật khẩu</option></select>
+        </div>
+        <button onclick="makeQR()">Tạo QR</button>
+        <div id="qrResult" class="result"></div>
+      </article>
+
+      <article class="card">
+        <div class="icon">🧾</div><h3>Tạo mã đơn</h3>
+        <p>Mã đơn ngắn để dùng cho chuyển khoản / hỗ trợ.</p>
+        <button onclick="makeOrderCode()">Tạo mã mới</button>
+        <div id="orderResult" class="result"></div>
+      </article>
+
+      <article class="card">
+        <div class="icon">📊</div><h3>Trạng thái M4X</h3>
+        <p>Kiểm tra web chính và trang Toolbox có phản hồi hay không.</p>
+        <button onclick="checkM4X()">Kiểm tra</button>
+        <div id="statusResult" class="result"></div>
+      </article>
+    </section>
+
+    <section class="grid tabpanel" id="tab-network">
+      <article class="card">
+        <div class="icon">🔗</div><h3>Kiểm tra Link</h3>
+        <input id="checkUrl" placeholder="https://example.com"/>
+        <button onclick="inspectUrl()">Phân tích link</button>
+        <div id="urlResult" class="result"></div>
+      </article>
+
+      <article class="card">
+        <div class="icon">🌐</div><h3>Tra IP công khai</h3>
+        <button onclick="getPublicIp()">Lấy IP</button>
+        <div id="ipResult" class="result"></div>
+      </article>
+
+      <article class="card">
+        <div class="icon">🧭</div><h3>Tách Domain</h3>
+        <input id="domainInput" placeholder="https://sub.example.com/path?a=1"/>
+        <button onclick="parseDomain()">Phân tích</button>
+        <div id="domainResult" class="result"></div>
+      </article>
+    </section>
+
+    <section class="grid tabpanel" id="tab-dev">
+      <article class="card">
+        <div class="icon">🆔</div><h3>UUID Generator</h3>
+        <button onclick="makeUuid()">Tạo UUID</button>
+        <div id="uuidResult" class="result"></div>
+      </article>
+
+      <article class="card">
+        <div class="icon">🔐</div><h3>Tạo chuỗi ngẫu nhiên</h3>
+        <input id="randLen" type="number" min="8" max="128" value="32"/>
+        <button onclick="makeRandom()">Tạo chuỗi</button>
+        <div id="randomResult" class="result"></div>
+      </article>
+
+      <article class="card">
+        <div class="icon">#️⃣</div><h3>SHA‑256</h3>
+        <textarea id="hashText" placeholder="Nhập nội dung cần băm..."></textarea>
+        <button onclick="hashSha256()">Tạo SHA‑256</button>
+        <div id="hashResult" class="result"></div>
+      </article>
+    </section>
+  </main>
+
+  <footer>M4X TOOLBOX · Chạy ưu tiên phía client · Không lưu file người dùng</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="assets/m4x-toolbox.js"></script>
+</body>
+</html>
