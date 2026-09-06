@@ -155,7 +155,7 @@ async function prepareUpload(body: any) {
 
   const rawMode = clip(body?.mode || "full", 16).toLowerCase();
   const mode = ["text", "scan", "full"].includes(rawMode) ? rawMode : "full";
-  const sourcePath = `source/${crypto.randomUUID()}/${originalName}`;
+  const sourcePath = `source/${crypto.randomUUID()}/source.mtz`;
 
   const sb = adminClient();
   const { data, error } = await sb.storage
@@ -236,7 +236,7 @@ async function quote(req: Request) {
   const textFee = tierFee(textChars, pricing.text_tiers, "Lượng văn bản");
   const amount = Math.max(10000, basePrice + sizeFee + imageFee + textFee);
   const sourceHash = await sha256Bytes(mtzBytes);
-  const sourcePath = `source/${crypto.randomUUID()}/${originalName}`;
+  const sourcePath = `source/${crypto.randomUUID()}/source.mtz`;
   const sb = adminClient();
   const upload = await sb.storage.from("theme-translation-private").upload(sourcePath, mtzBytes, {
     contentType: "application/octet-stream",
