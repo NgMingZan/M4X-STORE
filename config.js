@@ -1,6 +1,6 @@
 window.M4X_CONFIG = {
-  SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR_PUBLISHABLE_KEY",
+  SUPABASE_URL: "https://cpkyzqmpqxcydsavobcf.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_S7kPwymVYp7a4A_aTWzPvw_802a7Owr",
   BANK: {
     name: "VietinBank",
     account: "106885804727",
