@@ -1,9 +1,8 @@
 
-const BASE=window.M4X_CONFIG||{};
-let SAVED={};
-try{SAVED=JSON.parse(localStorage.getItem('m4x_supabase_config')||'{}')}catch{}
-const C={...BASE,SUPABASE_URL:SAVED.url||BASE.SUPABASE_URL||'',SUPABASE_ANON_KEY:SAVED.key||BASE.SUPABASE_ANON_KEY||''};
-
+const C = {
+  SUPABASE_URL: window.M4X_CONFIG?.SUPABASE_URL || '',
+  SUPABASE_ANON_KEY: window.M4X_CONFIG?.SUPABASE_ANON_KEY || ''
+};
 const sb=supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON_KEY);
 window.ADM = window.ADM || {};
 const $=id=>document.getElementById(id);
